@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Drupal\bunny_net\Form;
 
 use Drupal\Core\Form\ConfigFormBase;
-use Drupal\Core\Form\ConfigTarget;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Site\Settings;
 
@@ -105,16 +104,9 @@ final class SettingsForm extends ConfigFormBase {
       '#description' => $this->t('Needed when several sites share the pull zone, so they purge only their own pages. Use a different one per site.'),
       '#config_target' => 'bunny_net.settings:tags.prefix',
     ];
-    $form['tags']['blocklist'] = [
-      '#type' => 'textarea',
-      '#title' => $this->t('Tags never sent or purged'),
-      '#description' => $this->t('One per line; * matches any characters. <code>rendered</code> belongs here: every theme or config change invalidates it.'),
-      '#config_target' => new ConfigTarget(
-        'bunny_net.settings',
-        'tags.blocklist',
-        static fn(array $tags): string => implode("\n", $tags),
-        static fn(string $text): array => array_values(array_filter(array_map(trim(...), explode("\n", $text)), static fn(string $tag): bool => $tag !== '')),
-      ),
+    $form['tags']['purifier'] = [
+      '#type' => 'item',
+      '#markup' => $this->t('Which tags are written and purged is set in Cache Purifier: its blocklist, aliases and buckets, and its rules for who and what may purge.'),
     ];
 
     $form['edge_rules'] = [

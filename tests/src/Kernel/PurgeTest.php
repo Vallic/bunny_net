@@ -47,6 +47,22 @@ final class PurgeTest extends BunnyNetKernelTestBase {
   }
 
   /**
+   * Blocklist wildcards keep tags out of the purge, as out of the header.
+   */
+  public function testBlocklistedTagsAreNotPurged(): void {
+    $this->config('cache_purifier.settings')->set('outbound.blocklist', ['config:*', '*_list'])->save();
+    $this->container->get('bunny_net.cache_tags_invalidator')->destruct();
+    $this->answerNoContent();
+
+    $result = $this->container->get('bunny_net.purger')->purgeTags(['node_list', 'node:1', 'auction_list']);
+
+    $this->assertSame(['node:1'], $result->purged);
+    $this->assertSame([
+      ['POST /pullzone/4321/purgeCache', ['CacheTag' => (new HashedTagList())->purgeValue('node:1')]],
+    ], $this->sentRequests());
+  }
+
+  /**
    * The prefix goes into the purge, as it goes into the header.
    */
   public function testPrefixedTags(): void {

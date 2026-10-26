@@ -20,6 +20,8 @@ Bunny's purge rate limits.
 - Drupal 11.3 or later, or Drupal 12
 - PHP 8.3 or later
 - A bunny.net account API key and a pull zone
+- [Cache Purifier](https://www.drupal.org/project/cache_purifier), which
+  decides which tags are written and purged
 
 The [Purge](https://www.drupal.org/project/purge) module is not needed.
 
@@ -63,7 +65,6 @@ $config['bunny_net.settings']['purge']['enabled'] = TRUE;
 | `purge.on_cache_rebuild` | `false` | Empty the pull zone on every cache rebuild, such as `drush cr` at the end of a deploy. |
 | `tags.header` | `true` | Add the `CDN-Tag` header. |
 | `tags.prefix` | `''` | Prepended to every tag. Needed when several sites share a pull zone; give each site its own prefix. |
-| `tags.blocklist` | `http_response`, `rendered`, `library_info` | Tags never sent or purged; `*` matches any characters. |
 | `edge_scripts` | `{}` | See below. |
 | `edge_rules.directory` | `''` | See below. |
 
@@ -72,14 +73,18 @@ proxy cache maximum age* under *Configuration → Development → Performance*.
 
 ### How cache tags are written
 
-Bunny caps `CDN-Tag` at 1024 bytes. Each tag is therefore hashed to a
-12-character token, and a purge matches the token with a wildcard. About 78
-tags fit in one header. If a page has more, the rest are left out, and those
-pages refresh only when their cache lifetime ends. A hash collision only causes
-an extra purge.
+Only public responses get a `CDN-Tag` header; bunny.net caches no others.
 
-`rendered` is blocklisted because Drupal invalidates it on every theme or
-config change, and purging it would empty the whole pull zone each time.
+Which tags are written and purged is Cache Purifier's outbound policy: its
+blocklist, aliases and buckets, and the order that puts list tags first. Its
+rules decide who and what may purge; target them at
+`bunny_net.cache_tags_invalidator`.
+
+Bunny caps `CDN-Tag` at 1024 bytes. Each tag is therefore hashed to a
+5-character token, and a purge matches the token with a wildcard. About 170
+tags fit in one header. If a page has more, the last ones are left out, and
+those pages refresh only when their cache lifetime ends. A hash collision only
+causes an extra purge.
 
 ### Rate limits and the queue
 

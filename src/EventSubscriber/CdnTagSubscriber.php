@@ -14,8 +14,10 @@ use Valicm\BunnyToolkit\CacheTag\CdnTagHeader;
 /**
  * Writes a response's cache tags into the CDN-Tag header bunny.net reads.
  *
- * The header is set before the page cache stores the response, so pages
- * served from Drupal's page cache carry it too.
+ * Only public responses get it: bunny.net does not cache the others, and
+ * their tags would only fill the tag report. The header is set before the
+ * page cache stores the response, so pages served from Drupal's page cache
+ * carry it too.
  */
 final class CdnTagSubscriber implements EventSubscriberInterface {
 
@@ -36,7 +38,10 @@ final class CdnTagSubscriber implements EventSubscriberInterface {
    */
   public function onResponse(ResponseEvent $event): void {
     $response = $event->getResponse();
-    if (!$event->isMainRequest() || !$response instanceof CacheableResponseInterface || !$this->cacheTags->headerEnabled()) {
+    if (!$event->isMainRequest()
+      || !$response instanceof CacheableResponseInterface
+      || !$response->headers->hasCacheControlDirective('public')
+      || !$this->cacheTags->headerEnabled()) {
       return;
     }
     $header = $this->cacheTags->header($response->getCacheableMetadata()->getCacheTags());

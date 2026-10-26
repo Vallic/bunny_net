@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\bunny_net;
 
+use Drupal\cache_purifier\OutboundTags;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Valicm\BunnyToolkit\CacheTag\CdnTagHeader;
 use Valicm\BunnyToolkit\CacheTag\HashedTagList;
@@ -12,14 +13,11 @@ use Valicm\BunnyToolkit\CacheTag\TagFormat;
 /**
  * Which cache tags reach bunny.net, and how they are written.
  *
- * The response header and the purge go through the same filter and format,
- * so a purged tag always matches the header it was written into.
- *
- * - Tags on the blocklist are neither written nor purged. `rendered` is
- *   invalidated by every theme and config change, so purging it would empty
- *   the whole pull zone each time.
- * - The prefix keeps sites that share a pull zone from purging each other's
- *   pages.
+ * Cache Purifier's outbound policy decides the tags: its blocklist, aliases,
+ * buckets and order. The response header and the purge both go through it
+ * and through the same format, so a purged tag always matches the header it
+ * was written into. The prefix keeps sites that share a pull zone from
+ * purging each other's pages.
  */
 final class CacheTags {
 
@@ -30,6 +28,7 @@ final class CacheTags {
 
   public function __construct(
     private readonly ConfigFactoryInterface $configFactory,
+    private readonly OutboundTags $outbound,
   ) {
     $this->format = new HashedTagList();
   }
@@ -49,52 +48,40 @@ final class CacheTags {
   }
 
   /**
-   * The CDN-Tag header for a response carrying these tags.
+   * The CDN-Tag header for a response bunny.net may cache.
    *
    * @param iterable<string> $tags
    *   Drupal's cache tags.
    */
   public function header(iterable $tags): CdnTagHeader {
-    return $this->format->header($this->filter($tags));
+    return $this->format->header($this->prefix($this->outbound->forHeader($tags)));
   }
 
   /**
-   * The tags as bunny.net sees them: blocklisted ones gone, the rest prefixed.
+   * The tags to purge for invalidated cache tags, prefixed.
    *
    * @param iterable<string> $tags
    *   Drupal's cache tags.
    *
    * @return list<string>
-   *   The tags to write or purge, without duplicates.
+   *   The tags to purge, without duplicates.
    */
   public function filter(iterable $tags): array {
-    $config = $this->configFactory->get('bunny_net.settings');
-    $prefix = (string) $config->get('tags.prefix');
-    $blocklist = $this->blocklistPattern((array) $config->get('tags.blocklist'));
-
-    $filtered = [];
-    foreach ($tags as $tag) {
-      if ($blocklist === NULL || preg_match($blocklist, $tag) !== 1) {
-        $filtered[$prefix . $tag] = TRUE;
-      }
-    }
-    return array_map(strval(...), array_keys($filtered));
+    return $this->prefix($this->outbound->forPurge($tags));
   }
 
   /**
-   * One regular expression for the blocklist, where * matches anything.
+   * Prepends the configured prefix.
    *
-   * @param array<mixed> $entries
-   *   The blocklist from config.
+   * @param list<string> $tags
+   *   The tags.
+   *
+   * @return list<string>
+   *   The prefixed tags.
    */
-  private function blocklistPattern(array $entries): ?string {
-    $patterns = [];
-    foreach ($entries as $entry) {
-      if (is_string($entry) && trim($entry) !== '') {
-        $patterns[] = str_replace('\*', '.*', preg_quote(trim($entry), '/'));
-      }
-    }
-    return $patterns === [] ? NULL : '/^(?:' . implode('|', $patterns) . ')$/';
+  private function prefix(array $tags): array {
+    $prefix = (string) $this->configFactory->get('bunny_net.settings')->get('tags.prefix');
+    return $prefix === '' ? $tags : array_map(static fn(string $tag): string => $prefix . $tag, $tags);
   }
 
 }

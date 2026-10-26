@@ -9,7 +9,7 @@ services:
 
   bunny_net.cache_tags:
     class: Drupal\bunny_net\CacheTags
-    arguments: ['@config.factory']
+    arguments: ['@config.factory', '@cache_purifier.outbound']
 
   bunny_net.purger:
     class: Drupal\bunny_net\CachePurger

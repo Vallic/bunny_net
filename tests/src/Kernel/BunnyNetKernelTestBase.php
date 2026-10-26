@@ -25,7 +25,7 @@ abstract class BunnyNetKernelTestBase extends KernelTestBase {
   /**
    * {@inheritdoc}
    */
-  protected static $modules = ['system', 'bunny_net'];
+  protected static $modules = ['system', 'cache_purifier', 'bunny_net'];
 
   /**
    * The requests sent to bunny.net, as Guzzle's history middleware keeps them.
@@ -53,14 +53,15 @@ abstract class BunnyNetKernelTestBase extends KernelTestBase {
     $stack->push(Middleware::history($history));
     $this->container->set('http_client_factory', new ClientFactory($stack));
 
-    $this->installConfig(['bunny_net']);
+    $this->installConfig(['cache_purifier', 'bunny_net']);
+    // Config saves in the tests would otherwise purge their own tags.
+    $outbound = $this->config('cache_purifier.settings');
+    $outbound->set('outbound.blocklist', [...$outbound->get('outbound.blocklist'), 'config:*'])->save();
     $this->setSetting('bunny_net', ['api_key' => 'test-key']);
     $config = $this->config('bunny_net.settings');
     $config
       ->set('pull_zone_id', self::PULL_ZONE)
       ->set('purge.enabled', TRUE)
-      // Config saves in the tests would otherwise purge their own tags.
-      ->set('tags.blocklist', [...$config->get('tags.blocklist'), 'config:*'])
       ->save();
     $this->container->get('bunny_net.cache_tags_invalidator')->destruct();
   }

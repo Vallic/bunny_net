@@ -32,12 +32,6 @@ bunny_net.settings:
         prefix:
           type: string
           label: 'Tag prefix'
-        blocklist:
-          type: sequence
-          label: 'Tags never sent or purged'
-          sequence:
-            type: string
-            label: 'Tag, * matches any characters'
     edge_scripts:
       type: sequence
       label: 'Edge Scripts deployed from files'
