@@ -1,0 +1,6 @@
+# Bots looking for WordPress.
+description: Block WordPress probes
+action: BlockRequest
+triggers:
+  - type: Url
+    patterns: ['*wp-login.php', '*xmlrpc.php']

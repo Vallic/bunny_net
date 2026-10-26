@@ -1,0 +1,66 @@
+bunny_net.settings:
+  type: config_object
+  label: 'bunny.net settings'
+  mapping:
+    pull_zone_id:
+      type: integer
+      label: 'Pull zone ID'
+    purge:
+      type: mapping
+      label: 'Purging'
+      mapping:
+        enabled:
+          type: boolean
+          label: 'Purge the pull zone when Drupal invalidates cache tags'
+        mode:
+          type: string
+          label: 'When to purge: terminate or queue'
+          constraints:
+            Choice:
+              - terminate
+              - queue
+        on_cache_rebuild:
+          type: boolean
+          label: 'Purge everything on a cache rebuild'
+    tags:
+      type: mapping
+      label: 'Cache tags'
+      mapping:
+        header:
+          type: boolean
+          label: 'Add a CDN-Tag header to responses'
+        prefix:
+          type: string
+          label: 'Tag prefix'
+        blocklist:
+          type: sequence
+          label: 'Tags never sent or purged'
+          sequence:
+            type: string
+            label: 'Tag, * matches any characters'
+    edge_scripts:
+      type: sequence
+      label: 'Edge Scripts deployed from files'
+      sequence:
+        type: mapping
+        label: 'Edge Script'
+        mapping:
+          script_id:
+            type: integer
+            label: 'Script ID'
+          file:
+            type: string
+            label: 'File, relative to the Drupal root'
+          variables:
+            type: sequence
+            label: 'Variables'
+            sequence:
+              type: string
+              label: 'Value'
+    edge_rules:
+      type: mapping
+      label: 'Edge Rules'
+      mapping:
+        directory:
+          type: string
+          label: 'Directory of rule files, relative to the Drupal root'

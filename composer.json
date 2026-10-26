@@ -1,0 +1,18 @@
+{
+    "name": "drupal/bunny_net",
+    "type": "drupal-module",
+    "description": "CDN-Tag headers, cache purging, Edge Script deploys and Edge Rules from code for bunny.net.",
+    "homepage": "https://www.drupal.org/project/bunny_net",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "Valentino Međimorec",
+            "homepage": "https://www.drupal.org/u/valic",
+            "role": "Maintainer"
+        }
+    ],
+    "require": {
+        "php": ">=8.3",
+        "valicm/bunny-toolkit": "^1.0@alpha"
+    }
+}

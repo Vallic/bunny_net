@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<ruleset name="bunny_net">
+  <description>PHP CodeSniffer configuration for bunny.net.</description>
+  <file>.</file>
+  <arg name="extensions" value="php,module,inc,install,test,profile,theme,yml"/>
+  <exclude-pattern>*/.git/*</exclude-pattern>
+  <rule ref="Drupal"/>
+  <rule ref="DrupalPractice"/>
+</ruleset>

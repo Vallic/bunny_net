@@ -1,0 +1,15 @@
+pull_zone_id: 0
+purge:
+  enabled: false
+  mode: terminate
+  on_cache_rebuild: false
+tags:
+  header: true
+  prefix: ''
+  blocklist:
+    - http_response
+    - rendered
+    - library_info
+edge_scripts: {}
+edge_rules:
+  directory: ''

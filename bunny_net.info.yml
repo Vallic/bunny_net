@@ -1,0 +1,7 @@
+name: 'bunny.net'
+type: module
+description: 'CDN-Tag headers, cache purging, Edge Script deploys and Edge Rules from code for bunny.net.'
+core_version_requirement: ^11.3 || ^12
+php: 8.3
+package: Web services
+configure: bunny_net.settings

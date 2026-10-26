@@ -1,0 +1,11 @@
+description: Keep staging out of search engines
+action: SetResponseHeader
+parameters: [X-Robots-Tag, noindex]
+match: MatchAll
+triggers:
+  - type: RequestHeader
+    patterns: ['staging.*']
+    parameter: Host
+extra_actions:
+  - action: OverrideCacheTime
+    parameters: ['0']

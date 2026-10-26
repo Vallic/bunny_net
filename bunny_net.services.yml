@@ -1,0 +1,39 @@
+services:
+  logger.channel.bunny_net:
+    parent: logger.channel_base
+    arguments: ['bunny_net']
+
+  bunny_net.client_factory:
+    class: Drupal\bunny_net\BunnyClientFactory
+    arguments: ['@settings', '@http_client_factory']
+
+  bunny_net.cache_tags:
+    class: Drupal\bunny_net\CacheTags
+    arguments: ['@config.factory']
+
+  bunny_net.purger:
+    class: Drupal\bunny_net\CachePurger
+    arguments: ['@bunny_net.client_factory', '@bunny_net.cache_tags', '@config.factory', '@queue', '@logger.channel.bunny_net']
+
+  # Every cache tag invalidation passes through here, so it takes no
+  # dependencies until a request that invalidated something ends.
+  bunny_net.cache_tags_invalidator:
+    class: Drupal\bunny_net\PurgeCollector
+    arguments: [!service_closure '@bunny_net.purger', !service_closure '@logger.channel.bunny_net']
+    tags:
+      - { name: cache_tags_invalidator }
+      - { name: needs_destruction }
+
+  bunny_net.cdn_tag_subscriber:
+    class: Drupal\bunny_net\EventSubscriber\CdnTagSubscriber
+    arguments: ['@bunny_net.cache_tags']
+    tags:
+      - { name: event_subscriber }
+
+  bunny_net.script_deployer:
+    class: Drupal\bunny_net\EdgeScript\ScriptDeployer
+    arguments: ['@bunny_net.client_factory', '@config.factory', '@settings', '%app.root%']
+
+  bunny_net.edge_rule_sync:
+    class: Drupal\bunny_net\EdgeRule\EdgeRuleSync
+    arguments: ['@bunny_net.client_factory', '@config.factory', '%app.root%']

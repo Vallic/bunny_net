@@ -1,0 +1,9 @@
+administer bunny_net:
+  title: 'Administer bunny.net'
+  description: 'Change the pull zone, cache tag and purge settings.'
+  restrict access: true
+
+purge bunny_net cache:
+  title: 'Purge the bunny.net cache'
+  description: 'Empty the whole pull zone from the admin UI.'
+  restrict access: true

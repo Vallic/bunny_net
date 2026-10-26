@@ -1,0 +1,15 @@
+bunny_net.settings:
+  path: '/admin/config/services/bunny-net'
+  defaults:
+    _form: '\Drupal\bunny_net\Form\SettingsForm'
+    _title: 'bunny.net'
+  requirements:
+    _permission: 'administer bunny_net'
+
+bunny_net.purge_all:
+  path: '/admin/config/services/bunny-net/purge'
+  defaults:
+    _form: '\Drupal\bunny_net\Form\PurgeAllForm'
+    _title: 'Purge everything'
+  requirements:
+    _permission: 'purge bunny_net cache'

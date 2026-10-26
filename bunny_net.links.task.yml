@@ -1,0 +1,9 @@
+bunny_net.settings:
+  title: 'Settings'
+  route_name: bunny_net.settings
+  base_route: bunny_net.settings
+
+bunny_net.purge_all:
+  title: 'Purge everything'
+  route_name: bunny_net.purge_all
+  base_route: bunny_net.settings
