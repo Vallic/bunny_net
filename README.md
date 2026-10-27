@@ -1,21 +1,36 @@
 # Bunny CDN
 
-Connects Drupal to [Bunny CDN](https://bunny.net):
+Connects Drupal to [Bunny CDN](https://bunny.net): pages are purged by cache
+tag when Drupal changes them, and the pull zone's setup is kept in config and
+the repository, so every environment gets the same one.
 
-- **Cache tags.** Responses get a `CDN-Tag` header. When Drupal invalidates a
-  cache tag, for example on a node save, the pages carrying it are purged.
-- **Purging** everything in the pull zone, or individual URLs, from Drush or
-  the admin UI.
-- **Pull zone settings**, such as cookie vary and stale caching, kept in config
-  and synced to the pull zone.
-- **Edge Scripts** (pull zone middleware) deployed from files in your
-  repository.
-- **Edge Rules** kept as YAML files in your repository and synced to the pull
-  zone.
+- **Cache tag purging.** Responses carry a `CDN-Tag` header. When Drupal
+  invalidates a tag, on a node save for example, the pages carrying it are
+  purged, at the end of the request or from a queue, within Bunny's rate
+  limits. With the Redis module, the limits are counted once for every web
+  head and worker.
+- **Tags chosen by [Cache Purifier](https://www.drupal.org/project/cache_purifier).**
+  Its blocklist, aliases and buckets decide which tags reach the header and
+  the purges, so framework tags such as `rendered` don't fill either.
+- **Purging by hand**: URLs, tags or the whole pull zone, from Drush or the
+  admin UI.
+- **Caching from the settings page.** Pages Drupal marks private are never
+  cached, and visitors with a Drupal session get pages from Drupal, not the
+  anonymous copy. Choose paths never cached, what the cache keeps separate
+  copies by, countries to block, and browser cache times.
+- **Pull zone settings** kept in config by their API names and synced to the
+  pull zone, starting from the settings a Drupal site wants.
+- **Your own 502/504 page**, from an HTML file in the repository.
+- **Edge Scripts** (pull zone middleware) deployed from files in the
+  repository, with variables, and secrets from `settings.php`.
+- **Edge Rules** kept as YAML files in the repository and synced to the pull
+  zone, with example rules for Shield to copy.
+- **`drush bunny:sync`** brings the pull zone in line with all of it on
+  deploy.
 
 It talks to Bunny CDN through
-[valicm/bunny-toolkit](https://github.com/valicm/bunny-toolkit), which handles
-Bunny's purge rate limits.
+[valicm/bunny-toolkit](https://github.com/valicm/bunny-toolkit), a PHP client
+generated from Bunny's OpenAPI specs.
 
 ## Requirements
 
@@ -431,6 +446,17 @@ come after it above 45.
 
 Shield itself, its WAF and bot detection, is set up in the Bunny CDN
 dashboard.
+
+## Similar modules
+
+- [Bunny CDN](https://www.drupal.org/project/bunny_cdn) (`bunny_cdn`) adds a
+  Bunny CDN purger to the [Purge](https://www.drupal.org/project/purge)
+  module, set up in Purge's UI. This module purges without Purge, and also
+  keeps the pull zone's settings, caching, Edge Rules and Edge Scripts in
+  config.
+- [CDN](https://www.drupal.org/project/cdn) rewrites file URLs to a CDN's
+  hostname, for a CDN in front of files only. With a pull zone in front of
+  the whole site, it isn't needed.
 
 ## Maintainers
 
