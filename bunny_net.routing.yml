@@ -2,7 +2,7 @@ bunny_net.settings:
   path: '/admin/config/services/bunny-net'
   defaults:
     _form: '\Drupal\bunny_net\Form\SettingsForm'
-    _title: 'bunny.net'
+    _title: 'Bunny CDN'
   requirements:
     _permission: 'administer bunny_net'
 

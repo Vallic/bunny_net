@@ -20,8 +20,8 @@ Bunny's purge rate limits.
 - Drupal 11.3 or later, or Drupal 12
 - PHP 8.3 or later
 - A bunny.net account API key and a pull zone
-- [Cache Purifier](https://www.drupal.org/project/cache_purifier), which
-  decides which tags are written and purged
+- [Cache Purifier](https://www.drupal.org/project/cache_purifier) 1.0 or
+  later, which decides which tags are written and purged
 
 The [Purge](https://www.drupal.org/project/purge) module is not needed.
 
@@ -45,7 +45,7 @@ $settings['bunny_net']['api_key'] = getenv('BUNNY_API_KEY');
 
 ### Pull zone and purging
 
-Set the pull zone ID under *Configuration → Web services → bunny.net*
+Set the pull zone ID under *Configuration → Web services → Bunny CDN*
 (`/admin/config/services/bunny-net`).
 
 Purging is **off** until you turn it on. Turn it on only in the environment
@@ -90,7 +90,15 @@ causes an extra purge.
 ### Rate limits and the queue
 
 Bunny limits purges per account. What a request can't purge straight away goes
-to the `bunny_net_purge` queue, which cron works through. A purge that bunny.net
+to the `bunny_net_purge` queue, which cron works through for up to 30 seconds
+per run. To work it through on its own, for example more often than cron runs
+or from a worker:
+
+```
+drush queue:run bunny_net_purge --time-limit=60
+```
+
+The settings page shows how many purges are waiting. A purge that bunny.net
 rejects, for example because of a wrong API key, is logged to the `bunny_net`
 channel and not retried.
 
@@ -107,9 +115,10 @@ channel and not retried.
 
 ## Edge Scripts
 
-List scripts in `bunny_net.settings` (there is no form for this; edit the
-exported config file). Paths are relative to the Drupal root, like the config
-sync directory:
+List scripts in the exported `bunny_net.settings`. The settings page shows
+them, with whether each file exists and which variables and secrets are set,
+but they are edited in config, like the files they point to. Paths are
+relative to the Drupal root, like the config sync directory:
 
 ```yaml
 edge_scripts:
@@ -133,7 +142,9 @@ never run on their own, so add the command to your deploy steps.
 
 ## Edge Rules
 
-Point `edge_rules.directory` at a directory of YAML files, one rule per file:
+Point `edge_rules.directory` in the exported `bunny_net.settings` at a
+directory of YAML files, one rule per file. The settings page shows the
+directory and how many rules it holds, or what is wrong with a file:
 
 ```yaml
 # ../bunny/rules/block-probes.yml

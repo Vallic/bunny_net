@@ -17,8 +17,9 @@ bunny_net.settings:
           label: 'When to purge: terminate or queue'
           constraints:
             Choice:
-              - terminate
-              - queue
+              choices:
+                - terminate
+                - queue
         concurrency:
           type: integer
           label: 'Purge requests sent at once'

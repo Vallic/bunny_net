@@ -63,6 +63,30 @@ final class ScriptDeployer {
   }
 
   /**
+   * What is configured for each script, without secret values.
+   *
+   * @return list<array{name: string, script_id: int, file: string, exists: bool, variables: list<string>, secrets: list<string>}>
+   *   One entry per script: the file as configured, whether it exists, and
+   *   the names of its variables and of its secrets in settings.php.
+   */
+  public function overview(): array {
+    $secrets = $this->secrets();
+    $overview = [];
+    foreach ($this->scripts() as $name => $script) {
+      $file = (string) ($script['file'] ?? '');
+      $overview[] = [
+        'name' => (string) $name,
+        'script_id' => (int) ($script['script_id'] ?? 0),
+        'file' => $file,
+        'exists' => $file !== '' && is_file($this->path($file)),
+        'variables' => array_keys(self::stringMap($script['variables'] ?? [])),
+        'secrets' => array_keys(self::stringMap($secrets[$name] ?? [])),
+      ];
+    }
+    return $overview;
+  }
+
+  /**
    * Deploys one script unless its code already matches the file.
    *
    * @param string $name

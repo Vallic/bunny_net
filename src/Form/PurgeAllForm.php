@@ -20,7 +20,7 @@ use Valicm\BunnyToolkit\Http\ApiException;
 final class PurgeAllForm extends ConfirmFormBase {
 
   public function __construct(
-    protected readonly CachePurger $purger,
+    protected CachePurger $purger,
   ) {}
 
   /**

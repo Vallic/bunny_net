@@ -4,17 +4,49 @@ declare(strict_types=1);
 
 namespace Drupal\bunny_net\Form;
 
+use Drupal\bunny_net\CachePurger;
+use Drupal\bunny_net\EdgeRule\EdgeRuleSync;
+use Drupal\bunny_net\EdgeScript\ScriptDeployer;
+use Drupal\bunny_net\NotConfiguredException;
+use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Queue\QueueFactory;
 use Drupal\Core\Site\Settings;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * The pull zone, cache tag and purge settings.
  *
- * Edge Scripts are configured in bunny_net.settings directly; their secrets
- * belong in settings.php, so this form has no fields for them.
+ * Edge Scripts and Edge Rules are files in the site's repository, deployed
+ * with Drush, so they are set in the exported bunny_net.settings and only
+ * shown here.
  */
 final class SettingsForm extends ConfigFormBase {
+
+  public function __construct(
+    ConfigFactoryInterface $configFactory,
+    TypedConfigManagerInterface $typedConfigManager,
+    protected ScriptDeployer $scriptDeployer,
+    protected EdgeRuleSync $edgeRuleSync,
+    protected QueueFactory $queueFactory,
+  ) {
+    parent::__construct($configFactory, $typedConfigManager);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container): self {
+    return new self(
+      $container->get('config.factory'),
+      $container->get('config.typed'),
+      $container->get('bunny_net.script_deployer'),
+      $container->get('bunny_net.edge_rule_sync'),
+      $container->get('queue'),
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -80,6 +112,16 @@ final class SettingsForm extends ConfigFormBase {
       ],
       '#config_target' => 'bunny_net.settings:purge.mode',
     ];
+    $form['purge']['queue'] = [
+      '#type' => 'item',
+      '#title' => $this->t('Queue'),
+      '#markup' => $this->formatPlural(
+        $this->queueFactory->get(CachePurger::QUEUE)->numberOfItems(),
+        '1 purge waiting.',
+        '@count purges waiting.',
+      ),
+      '#description' => $this->t('Cron works through the queue for up to 30 seconds per run. To work it through on its own, for example more often than cron runs or from a worker, run <code>drush queue:run @queue</code>; <code>--time-limit</code> caps how long it runs.', ['@queue' => CachePurger::QUEUE]),
+    ];
     $form['purge']['concurrency'] = [
       '#type' => 'number',
       '#title' => $this->t('Purge requests sent at once'),
@@ -117,19 +159,80 @@ final class SettingsForm extends ConfigFormBase {
       '#markup' => $this->t('Which tags are written and purged is set in Cache Purifier: its blocklist, aliases and buckets, and its rules for who and what may purge.'),
     ];
 
-    $form['edge_rules'] = [
+    $form['edge_scripts'] = $this->edgeScripts();
+    $form['edge_rules'] = $this->edgeRules();
+
+    return parent::buildForm($form, $form_state);
+  }
+
+  /**
+   * The configured Edge Scripts, such as pull zone middleware.
+   *
+   * @return array<string, mixed>
+   *   The render array.
+   */
+  private function edgeScripts(): array {
+    $rows = [];
+    foreach ($this->scriptDeployer->overview() as $script) {
+      $rows[] = [
+        $script['name'],
+        $script['script_id'] ?: $this->t('Missing'),
+        $script['exists'] ? $script['file'] : $this->t('@file (not found)', ['@file' => $script['file'] ?: '-']),
+        implode(', ', $script['variables']) ?: '-',
+        implode(', ', $script['secrets']) ?: '-',
+      ];
+    }
+    return [
+      '#type' => 'details',
+      '#title' => $this->t('Edge Scripts (middleware)'),
+      '#open' => TRUE,
+      '#description' => $this->t("Code that runs on bunny.net in front of the site, deployed from files in the repository with <code>drush bunny:script-deploy</code>. List them under <code>edge_scripts</code> in the exported <code>bunny_net.settings</code>, and put their secrets in settings.php as <code>\$settings['bunny_net']['edge_script_secrets']</code>."),
+      'scripts' => [
+        '#type' => 'table',
+        '#header' => [
+          $this->t('Name'),
+          $this->t('Script ID'),
+          $this->t('File'),
+          $this->t('Variables'),
+          $this->t('Secrets in settings.php'),
+        ],
+        '#rows' => $rows,
+        '#empty' => $this->t('None configured.'),
+      ],
+    ];
+  }
+
+  /**
+   * The Edge Rules directory and what it holds.
+   *
+   * @return array<string, mixed>
+   *   The render array.
+   */
+  private function edgeRules(): array {
+    try {
+      $directory = $this->edgeRuleSync->directory();
+      try {
+        $count = count($this->edgeRuleSync->read($directory));
+        $status = $this->formatPlural($count, '@directory: 1 rule.', '@directory: @count rules.', ['@directory' => $directory]);
+      }
+      catch (\InvalidArgumentException $e) {
+        $status = $e->getMessage();
+      }
+    }
+    catch (NotConfiguredException) {
+      $status = $this->t('No directory configured.');
+    }
+    return [
       '#type' => 'details',
       '#title' => $this->t('Edge Rules'),
       '#open' => TRUE,
+      '#description' => $this->t('Rules bunny.net applies to requests, such as redirects and blocks, kept as YAML files in the repository and synced with <code>drush bunny:rules-sync</code>. Set the directory as <code>edge_rules.directory</code> in the exported <code>bunny_net.settings</code>.'),
+      'status' => [
+        '#type' => 'item',
+        '#title' => $this->t('Rules'),
+        '#markup' => $status,
+      ],
     ];
-    $form['edge_rules']['directory'] = [
-      '#type' => 'textfield',
-      '#title' => $this->t('Rules directory'),
-      '#description' => $this->t('YAML rule files, relative to the Drupal root, e.g. <code>../bunny/rules</code>. Sync them with <code>drush bunny:rules-sync</code>.'),
-      '#config_target' => 'bunny_net.settings:edge_rules.directory',
-    ];
-
-    return parent::buildForm($form, $form_state);
   }
 
 }
