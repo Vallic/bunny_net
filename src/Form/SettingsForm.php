@@ -193,8 +193,8 @@ final class SettingsForm extends ConfigFormBase {
   /**
    * {@inheritdoc}
    *
-   * @param array<string, mixed> $form
-   *   The form.
+   * @param array<mixed> $form
+   *   The form; core's validateForm() hands it back as a plain array.
    * @param \Drupal\Core\Form\FormStateInterface $form_state
    *   The form state.
    */

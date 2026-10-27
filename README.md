@@ -67,7 +67,7 @@ $settings['bunny_net']['api_key'] = getenv('BUNNY_API_KEY');
 ### Pull zone and purging
 
 Set the pull zone ID under *Configuration → Web services → Bunny CDN*
-(`/admin/config/services/bunny-net`).
+(`/admin/config/services/bunny`).
 
 Purging is **off** until you turn it on. Turn it on only in the environment
 that owns the pull zone, so a local or staging copy of production's config

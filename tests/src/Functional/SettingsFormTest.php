@@ -57,10 +57,10 @@ final class SettingsFormTest extends BrowserTestBase {
     ]);
 
     $this->drupalLogin($this->drupalCreateUser(['administer bunny_net']));
-    $this->drupalGet('admin/config/services/bunny-net');
+    $this->drupalGet('admin/config/services/bunny');
     $this->assertSession()->titleEquals('Bunny CDN | Drupal');
     $this->container->get('queue')->get('bunny_net_purge')->createItem(['type' => 'tags', 'items' => ['node:1']]);
-    $this->drupalGet('admin/config/services/bunny-net');
+    $this->drupalGet('admin/config/services/bunny');
     $this->assertSession()->pageTextContains('1 purge waiting.');
     $this->assertSession()->pageTextContains('drush queue:run bunny_net_purge');
     $this->assertSession()->pageTextContains('middleware 77');
@@ -79,7 +79,7 @@ final class SettingsFormTest extends BrowserTestBase {
     $this->assertCount(2, $this->config('bunny_net.settings')->get('pull_zone_settings'), 'Pull zone settings are left as they were.');
 
     $this->config('bunny_net.settings')->set('edge_rules.directory', $fixtures . '/rules')->save();
-    $this->drupalGet('admin/config/services/bunny-net');
+    $this->drupalGet('admin/config/services/bunny');
     $this->assertSession()->pageTextContains('rules: 2 rules.');
   }
 
@@ -88,7 +88,7 @@ final class SettingsFormTest extends BrowserTestBase {
    */
   public function testCaching(): void {
     $this->drupalLogin($this->drupalCreateUser(['administer bunny_net']));
-    $this->drupalGet('admin/config/services/bunny-net');
+    $this->drupalGet('admin/config/services/bunny');
 
     $this->submitForm([
       'caching[enabled]' => TRUE,

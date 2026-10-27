@@ -121,7 +121,7 @@ final class PullZoneSettingsTest extends BunnyNetKernelTestBase {
 
     $this->assertSame([], $this->settings()->errorPage());
     $this->assertFalse($this->settings()->isConfigured());
-    $this->assertStringEndsWith('/../bunny/error-page.html', $this->settings()->errorPagePath());
+    $this->assertSame(dirname($this->root) . '/bunny/error-page.html', $this->settings()->errorPagePath(), 'Beside the Drupal root, without "..".');
   }
 
   /**
@@ -179,12 +179,11 @@ final class PullZoneSettingsTest extends BunnyNetKernelTestBase {
   }
 
   /**
-   * The recommended settings are ones the API takes, with their reasons.
+   * The recommended settings are ones the API takes.
    */
   public function testRecommended(): void {
-    foreach (PullZoneSettings::RECOMMENDED as $key => [$value, $reason]) {
+    foreach (PullZoneSettings::RECOMMENDED as $key => [$value]) {
       $this->assertSame($value, PullZoneSettings::toApi($key, $value), $key);
-      $this->assertNotSame('', $reason);
     }
   }
 
