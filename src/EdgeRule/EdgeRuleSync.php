@@ -6,6 +6,7 @@ namespace Drupal\bunny_net\EdgeRule;
 
 use Drupal\bunny_net\BunnyClientFactory;
 use Drupal\bunny_net\NotConfiguredException;
+use Drupal\bunny_net\PullZone\CachingSync;
 use Drupal\Component\Serialization\Yaml;
 use Drupal\Core\Config\ConfigFactoryInterface;
 
@@ -70,6 +71,10 @@ final class EdgeRuleSync {
         throw new \InvalidArgumentException(sprintf('%s: another file is already named %s.', $file, $name));
       }
       $rules[$name] = EdgeRuleDefinition::fromYaml(Yaml::decode((string) file_get_contents($file)), $file);
+      $order = $rules[$name]['order'];
+      if ($order !== NULL && $this->cachingEnabled() && $order >= CachingSync::FIRST_ORDER && $order <= CachingSync::LAST_ORDER) {
+        throw new \InvalidArgumentException(sprintf('%s: order %d is one of the caching rules\' places, %d to %d.', $file, $order, CachingSync::FIRST_ORDER, CachingSync::LAST_ORDER));
+      }
     }
     return $rules;
   }
@@ -99,14 +104,18 @@ final class EdgeRuleSync {
       }
       $name = EdgeRuleDefinition::managedName(is_string($rule['Description'] ?? NULL) ? $rule['Description'] : '');
       if ($name !== NULL && !isset($managed[$name])) {
-        $managed[$name] = ['guid' => $guid, 'definition' => EdgeRuleDefinition::fromApi($rule)];
+        $managed[$name] = ['guid' => $guid, 'definition' => EdgeRuleDefinition::fromApi($rule), 'rule' => $rule];
       }
       elseif ($name !== NULL) {
         // A second rule with the same marker: an earlier sync's duplicate.
-        $managed[$name . '#' . $guid] = ['guid' => $guid, 'definition' => NULL];
+        $managed[$name . '#' . $guid] = ['guid' => $guid, 'definition' => NULL, 'rule' => $rule];
+      }
+      elseif ($this->isCachingRule($rule)) {
+        // CachingSync's, which only it changes.
+        continue;
       }
       else {
-        $unmanaged[$guid] = EdgeRuleDefinition::fromApi($rule);
+        $unmanaged[$guid] = ['definition' => EdgeRuleDefinition::fromApi($rule), 'rule' => $rule];
       }
     }
 
@@ -114,14 +123,21 @@ final class EdgeRuleSync {
     foreach ($files as $name => $definition) {
       if (isset($managed[$name])) {
         $guid = $managed[$name]['guid'];
-        $changes[] = $managed[$name]['definition'] === $definition
+        $remote = $managed[$name]['definition'];
+        $changes[] = $remote !== NULL && EdgeRuleDefinition::matches($definition, $remote, $managed[$name]['rule'])
           ? new EdgeRuleChange(EdgeRuleChange::UNCHANGED, $name, $guid)
           : new EdgeRuleChange(EdgeRuleChange::UPDATE, $name, $guid, EdgeRuleDefinition::toApi($definition, $name, $guid));
         unset($managed[$name]);
         continue;
       }
-      $guid = array_search($definition, $unmanaged, TRUE);
-      if (is_string($guid)) {
+      $guid = NULL;
+      foreach ($unmanaged as $candidate => $remote) {
+        if (EdgeRuleDefinition::matches($definition, $remote['definition'], $remote['rule'])) {
+          $guid = (string) $candidate;
+          break;
+        }
+      }
+      if ($guid !== NULL) {
         unset($unmanaged[$guid]);
         $changes[] = new EdgeRuleChange(EdgeRuleChange::ADOPT, $name, $guid, EdgeRuleDefinition::toApi($definition, $name, $guid));
         continue;
@@ -172,7 +188,7 @@ final class EdgeRuleSync {
     $statuses = [];
     $names = [];
     foreach ($this->remoteRules() as $rule) {
-      if (!empty($rule['ReadOnly'])) {
+      if (!empty($rule['ReadOnly']) || $this->isCachingRule($rule)) {
         continue;
       }
       $description = is_string($rule['Description'] ?? NULL) ? $rule['Description'] : '';
@@ -192,6 +208,23 @@ final class EdgeRuleSync {
       $statuses[$file] = 'written';
     }
     return $statuses;
+  }
+
+  /**
+   * Whether the caching settings write their own rules to the zone.
+   */
+  private function cachingEnabled(): bool {
+    return (bool) $this->configFactory->get('bunny_net.settings')->get('caching.enabled');
+  }
+
+  /**
+   * Whether a rule is one of CachingSync's.
+   *
+   * @param array<mixed> $rule
+   *   An EdgeRuleV2Model.
+   */
+  private function isCachingRule(array $rule): bool {
+    return is_string($rule['Description'] ?? NULL) && str_starts_with($rule['Description'], CachingSync::PREFIX);
   }
 
   /**

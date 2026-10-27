@@ -7,6 +7,7 @@ namespace Drupal\Tests\bunny_net\Kernel;
 use Drupal\bunny_net\EdgeRule\EdgeRuleChange;
 use Drupal\bunny_net\EdgeRule\EdgeRuleDefinition;
 use Drupal\bunny_net\EdgeRule\EdgeRuleSync;
+use Drupal\bunny_net\PullZone\CachingSync;
 use Drupal\Component\Serialization\Yaml;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
@@ -70,6 +71,41 @@ final class EdgeRuleSyncTest extends BunnyNetKernelTestBase {
     $this->assertSame([EdgeRuleChange::ADOPT, EdgeRuleChange::CREATE], array_map(static fn(EdgeRuleChange $change): string => $change->operation, $changes));
     $this->assertSame('Block WordPress probes [bunny_net:block-probes]', $changes[0]->body['Description'] ?? NULL);
     $this->assertArrayNotHasKey('Guid', $changes[1]->body ?? []);
+  }
+
+  /**
+   * The caching rules are CachingSync's: not adopted, deleted or exported.
+   */
+  public function testCachingRulesAreLeftAlone(): void {
+    $caching = $this->remote('block-probes', 'guid-caching');
+    $caching['Description'] = CachingSync::PREFIX . 'paths never cached';
+    $zone = ['Id' => self::PULL_ZONE, 'EdgeRules' => [$caching, $this->remote('block-probes', 'guid-block')]];
+
+    $this->answerJson($zone);
+    $operations = array_map(static fn(EdgeRuleChange $change): string => $change->operation . ' ' . $change->guid, $this->sync()->plan());
+    $this->assertSame(['unchanged guid-block', 'create '], $operations);
+
+    $this->answerJson($zone);
+    $this->assertSame([$this->siteDirectory . '/rules/block-probes.yml'], array_keys($this->sync()->export($this->siteDirectory . '/rules')));
+  }
+
+  /**
+   * With caching managed, a file can't take one of the caching rules' places.
+   */
+  public function testOrderInTheCachingRange(): void {
+    $directory = $this->siteDirectory . '/ordered';
+    mkdir($directory);
+    file_put_contents($directory . '/late.yml', Yaml::encode([
+      'order' => 30,
+      'action' => 'BlockRequest',
+      'triggers' => [['type' => 'Url', 'patterns' => ['*']]],
+    ]));
+
+    $this->assertSame(30, $this->sync()->read($directory)['late']['order'], 'Fine while caching is off.');
+
+    $this->config('bunny_net.settings')->set('caching.enabled', TRUE)->save();
+    $this->expectExceptionMessage("order 30 is one of the caching rules' places, 20 to 45");
+    $this->sync()->read($directory);
   }
 
   /**

@@ -24,6 +24,9 @@ use Valicm\BunnyToolkit\Api\Core\Enum\TriggerTypes;
  *     patterns: ['*wp-login.php', '*xmlrpc.php']
  * @endcode
  *
+ * `order` places the rule among the zone's rules, as bunny.net's OrderIndex;
+ * left out, bunny.net places it and a sync leaves its place alone.
+ *
  * Names are the toolkit's enum cases (EdgeRuleActionType, TriggerTypes and
  * so on). A number is accepted too, for a value bunny.net added after the
  * toolkit was generated.
@@ -35,6 +38,7 @@ use Valicm\BunnyToolkit\Api\Core\Enum\TriggerTypes;
  * @phpstan-type ExtraAction array{action: string|int, parameters: list<string>}
  * @phpstan-type Definition array{
  *   description: string,
+ *   order: int|null,
  *   enabled: bool,
  *   action: string|int,
  *   parameters: list<string>,
@@ -76,7 +80,7 @@ final class EdgeRuleDefinition {
     if (!is_array($data)) {
       throw self::invalid($source, 'the file must hold a mapping');
     }
-    $keys = ['description', 'enabled', 'action', 'parameters', 'match', 'triggers', 'extra_actions'];
+    $keys = ['description', 'order', 'enabled', 'action', 'parameters', 'match', 'triggers', 'extra_actions'];
     $unknown = array_diff(array_keys($data), $keys);
     if ($unknown !== []) {
       throw self::invalid($source, sprintf('unknown key(s) %s', implode(', ', $unknown)));
@@ -121,9 +125,13 @@ final class EdgeRuleDefinition {
     if (isset($data['enabled']) && !is_bool($data['enabled'])) {
       throw self::invalid($source, 'enabled must be true or false');
     }
+    if (isset($data['order']) && (!is_int($data['order']) || $data['order'] < 0)) {
+      throw self::invalid($source, 'order must be a whole number, 0 or more');
+    }
 
     return [
       'description' => self::string($data['description'] ?? '', $source, 'description'),
+      'order' => $data['order'] ?? NULL,
       'enabled' => $data['enabled'] ?? TRUE,
       'action' => self::enumName(EdgeRuleActionType::class, $data['action'], $source, 'action'),
       'parameters' => self::parameters($data['parameters'] ?? [], $source, 'parameters'),
@@ -140,7 +148,8 @@ final class EdgeRuleDefinition {
    *   An EdgeRuleV2Model.
    *
    * @return Definition
-   *   The canonical rule, without the description's marker.
+   *   The canonical rule, without the description's marker. Its order is
+   *   left out: a file without one doesn't care, see orderOf().
    */
   public static function fromApi(array $rule): array {
     $triggers = [];
@@ -167,6 +176,7 @@ final class EdgeRuleDefinition {
 
     return [
       'description' => self::withoutMarker(is_string($rule['Description'] ?? NULL) ? $rule['Description'] : ''),
+      'order' => NULL,
       'enabled' => (bool) ($rule['Enabled'] ?? FALSE),
       'action' => self::nameOf(EdgeRuleActionType::class, $rule['ActionType'] ?? 0),
       'parameters' => self::apiParameters($rule),
@@ -211,6 +221,9 @@ final class EdgeRuleDefinition {
       'Description' => trim($definition['description'] . ' [bunny_net:' . $name . ']'),
       'Enabled' => $definition['enabled'],
     ];
+    if ($definition['order'] !== NULL) {
+      $body['OrderIndex'] = $definition['order'];
+    }
     if ($guid !== NULL) {
       $body = ['Guid' => $guid] + $body;
     }
@@ -228,6 +241,9 @@ final class EdgeRuleDefinition {
    */
   public static function toYaml(array $definition): array {
     $data = ['description' => $definition['description']];
+    if ($definition['order'] !== NULL) {
+      $data['order'] = $definition['order'];
+    }
     if (!$definition['enabled']) {
       $data['enabled'] = FALSE;
     }
@@ -253,6 +269,31 @@ final class EdgeRuleDefinition {
       $data['extra_actions'][] = $action['parameters'] === [] ? ['action' => $action['action']] : $action;
     }
     return $data;
+  }
+
+  /**
+   * Whether a rule on bunny.net is what a file describes.
+   *
+   * @param Definition $file
+   *   The rule file's definition.
+   * @param Definition $remote
+   *   The rule bunny.net has, from fromApi().
+   * @param array<mixed> $rule
+   *   The same rule as the API returned it, for its order.
+   */
+  public static function matches(array $file, array $remote, array $rule): bool {
+    return array_replace($file, ['order' => NULL]) === $remote
+      && ($file['order'] === NULL || $file['order'] === self::orderOf($rule));
+  }
+
+  /**
+   * A rule's place, as the API returned it.
+   *
+   * @param array<mixed> $rule
+   *   An EdgeRuleV2Model.
+   */
+  public static function orderOf(array $rule): ?int {
+    return is_numeric($rule['OrderIndex'] ?? NULL) ? (int) $rule['OrderIndex'] : NULL;
   }
 
   /**

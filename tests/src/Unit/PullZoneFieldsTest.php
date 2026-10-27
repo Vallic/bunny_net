@@ -64,7 +64,11 @@ final class PullZoneFieldsTest extends UnitTestCase {
    */
   public static function invalidProvider(): array {
     return [
-      'unknown' => ['EnableCookieVaryy', TRUE, 'EnableCookieVaryy is not a pull zone setting. Did you mean EnableCookieVary?'],
+      'unknown' => [
+        'EnableCookieVaryy',
+        TRUE,
+        'EnableCookieVaryy is not a pull zone setting. Did you mean EnableCookieVary?',
+      ],
       'bool' => ['EnableCookieVary', 'yes', 'EnableCookieVary must be true or false.'],
       'int' => ['OriginRetries', '1', 'OriginRetries must be a whole number.'],
       'list' => ['CookieVaryParameters', 'my_role', 'CookieVaryParameters must be a list.'],

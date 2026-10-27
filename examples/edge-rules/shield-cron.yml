@@ -1,0 +1,10 @@
+# An external cron service calling Drupal's cron URL is not a browser. The
+# key in the URL is what protects it.
+description: Cron URL skips Shield's challenge and bot detection
+order: 6
+action: DisableShieldChallenge
+triggers:
+  - type: Url
+    patterns: ['*/cron/*']
+extra_actions:
+  - action: DisableShieldBotDetection

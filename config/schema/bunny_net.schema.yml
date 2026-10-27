@@ -10,6 +10,16 @@ bunny_net.settings:
       label: 'Pull zone settings, by bunny.net API name'
       sequence:
         type: bunny_net.pull_zone_setting
+    error_page:
+      type: mapping
+      label: 'The page bunny.net shows when the site does not answer'
+      mapping:
+        file:
+          type: string
+          label: 'HTML file, relative to the Drupal root; empty for bunny.net''s page'
+        whitelabel:
+          type: boolean
+          label: 'Leave bunny.net''s name off the page'
     purge:
       type: mapping
       label: 'Purging'

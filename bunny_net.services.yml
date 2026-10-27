@@ -48,7 +48,7 @@ services:
 
   bunny_net.pull_zone_settings:
     class: Drupal\bunny_net\PullZone\PullZoneSettings
-    arguments: ['@bunny_net.client_factory', '@config.factory']
+    arguments: ['@bunny_net.client_factory', '@config.factory', '%app.root%']
 
   bunny_net.caching_sync:
     class: Drupal\bunny_net\PullZone\CachingSync

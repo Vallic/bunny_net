@@ -176,6 +176,7 @@ final class SettingsForm extends ConfigFormBase {
 
     $form['caching'] = $this->caching();
     $form['pull_zone_settings'] = $this->pullZoneSettings();
+    $form['error_page'] = $this->errorPage();
     $form['edge_scripts'] = $this->edgeScripts();
     $form['edge_rules'] = $this->edgeRules();
 
@@ -442,7 +443,7 @@ final class SettingsForm extends ConfigFormBase {
       '#type' => 'details',
       '#title' => $this->t('Pull zone settings'),
       '#open' => TRUE,
-      '#description' => $this->t('Settings such as cookie vary, stale caching and origin retries, by their bunny.net API names, synced to the pull zone with <code>drush bunny:zone-sync</code>. Set them as <code>pull_zone_settings</code> in the exported <code>bunny_net.settings</code>; <code>drush bunny:zone-export</code> prints the current values. Settings left out are managed in the bunny.net dashboard.'),
+      '#description' => $this->t('Settings such as cookie vary, stale caching and origin retries, by their bunny.net API names, synced to the pull zone with <code>drush bunny:zone-sync</code>. Set them as <code>pull_zone_settings</code> in the exported <code>bunny_net.settings</code>; <code>drush bunny:zone-export</code> prints the current values. Settings left out are managed in the bunny.net dashboard. <code>drush bunny:zone-recommend</code> lists the settings a Drupal site wants, and why.'),
       'settings' => [
         '#type' => 'table',
         '#header' => [$this->t('Setting'), $this->t('Value')],
@@ -459,6 +460,47 @@ final class SettingsForm extends ConfigFormBase {
         '#title' => $this->t('Not valid, so a sync would fail'),
         '#items' => explode("\n", $e->getMessage()),
       ];
+    }
+    return $element;
+  }
+
+  /**
+   * The page bunny.net shows when the site does not answer.
+   *
+   * @return array<string, mixed>
+   *   The form elements.
+   */
+  private function errorPage(): array {
+    $element = [
+      '#type' => 'details',
+      '#title' => $this->t('Error page'),
+      '#open' => TRUE,
+      '#tree' => TRUE,
+      '#description' => $this->t("What visitors see when bunny.net can't reach the site, a 502 or 504, instead of bunny.net's own page. An HTML file in the repository, sent with the pull zone settings by <code>drush bunny:zone-sync</code>. It is shown while Drupal is down, so it can't use the site's CSS, images or fonts: keep them inline, or load them from elsewhere. bunny.net fills in placeholders such as <code>{{status_code}}</code>, <code>{{status_title}}</code>, <code>{{status_description}}</code>, <code>{{target_hostname}}</code> and <code>{{user_ip}}</code>; <code>examples/error-page.html</code> in this module uses them."),
+    ];
+    $element['file'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('File'),
+      '#description' => $this->t("Relative to the Drupal root, such as <code>../bunny/error-page.html</code>. Empty leaves the error page to the bunny.net dashboard."),
+      '#config_target' => 'bunny_net.settings:error_page.file',
+    ];
+    $element['whitelabel'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t("Leave bunny.net's name off the page"),
+      '#config_target' => 'bunny_net.settings:error_page.whitelabel',
+    ];
+    if ($this->pullZoneSettings->errorPageFile() !== '') {
+      try {
+        $code = $this->pullZoneSettings->errorPage()['ErrorPageCustomCode'] ?? '';
+        $status = $this->t('@file: @count characters.', [
+          '@file' => $this->pullZoneSettings->errorPagePath(),
+          '@count' => mb_strlen((string) $code),
+        ]);
+      }
+      catch (\InvalidArgumentException $e) {
+        $status = $e->getMessage();
+      }
+      $element['status'] = ['#type' => 'item', '#title' => $this->t('Page'), '#markup' => $status];
     }
     return $element;
   }

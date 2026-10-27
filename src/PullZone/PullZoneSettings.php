@@ -23,13 +23,110 @@ use Drupal\Core\Config\ConfigFactoryInterface;
  *   UseStaleWhileUpdating: true
  *   LogFormat: Json
  * @endcode
+ *
+ * The page bunny.net shows when the origin can't answer is kept as an HTML
+ * file, error_page.file, and sent with these settings.
  */
 final class PullZoneSettings {
+
+  /**
+   * Settings a Drupal site behind bunny.net wants, and why.
+   *
+   * `drush bunny:zone-recommend` prints them, or saves them as
+   * pull_zone_settings.
+   */
+  public const array RECOMMENDED = [
+    'AddHostHeader' => [
+      TRUE,
+      "Drupal builds links and checks trusted_host_patterns from the Host header; without it, Drupal sees the origin's name.",
+    ],
+    'FollowRedirects' => [
+      FALSE,
+      'Followed at the edge, Drupal\'s redirects (http to https, the Redirect module, language prefixes) serve the page under the wrong URL.',
+    ],
+    'DisableCookies' => [
+      FALSE,
+      'Strips Set-Cookie from responses, so nobody can log in through the CDN. New pull zones have it on.',
+    ],
+    'CacheErrorResponses' => [
+      FALSE,
+      'With stale caching on, one cached 503 can be served long after the site has recovered.',
+    ],
+    'IgnoreQueryStrings' => [
+      FALSE,
+      'Pagers (?page=2) and search results would all get the first cached page.',
+    ],
+    'UseStaleWhileUpdating' => [
+      TRUE,
+      'Visitors get the cached page while bunny.net fetches a fresh one.',
+    ],
+    'UseStaleWhileOffline' => [
+      TRUE,
+      'Visitors get the cached page instead of an error while the site is down.',
+    ],
+  ];
+
+  /**
+   * The settings the error page file is sent as.
+   */
+  public const array ERROR_PAGE = ['ErrorPageEnableCustomCode', 'ErrorPageCustomCode', 'ErrorPageWhitelabel'];
 
   public function __construct(
     private readonly BunnyClientFactory $clientFactory,
     private readonly ConfigFactoryInterface $configFactory,
+    private readonly string $appRoot,
   ) {}
+
+  /**
+   * Whether there is anything to sync: settings, or an error page.
+   */
+  public function isConfigured(): bool {
+    return $this->configured() !== [] || $this->errorPageFile() !== '';
+  }
+
+  /**
+   * The error page file, as configured, or an empty string.
+   */
+  public function errorPageFile(): string {
+    return trim((string) $this->configFactory->get('bunny_net.settings')->get('error_page.file'));
+  }
+
+  /**
+   * The error page file's path, relative ones from the Drupal root.
+   */
+  public function errorPagePath(): string {
+    $file = $this->errorPageFile();
+    return $file === '' || str_starts_with($file, '/') || str_contains($file, '://') ? $file : $this->appRoot . '/' . $file;
+  }
+
+  /**
+   * The settings the error page is sent as, or none without a file.
+   *
+   * @return array<string, bool|string>
+   *   Values by API name.
+   *
+   * @throws \InvalidArgumentException
+   *   When the file can't be read, or pull_zone_settings sets them too.
+   */
+  public function errorPage(): array {
+    $path = $this->errorPagePath();
+    if ($path === '') {
+      return [];
+    }
+    $both = array_intersect(self::ERROR_PAGE, array_map(strval(...), array_keys($this->configured())));
+    if ($both !== []) {
+      throw new \InvalidArgumentException(sprintf('pull_zone_settings sets %s, which error_page.file sets: keep them in one place.', implode(', ', $both)));
+    }
+    $code = is_file($path) ? file_get_contents($path) : FALSE;
+    if (!is_string($code) || trim($code) === '') {
+      throw new \InvalidArgumentException(sprintf('The error page %s is missing or empty.', $path));
+    }
+    return [
+      'ErrorPageEnableCustomCode' => TRUE,
+      'ErrorPageCustomCode' => $code,
+      'ErrorPageWhitelabel' => (bool) $this->configFactory->get('bunny_net.settings')->get('error_page.whitelabel'),
+    ];
+  }
 
   /**
    * The settings in config, as written there.
@@ -44,6 +141,8 @@ final class PullZoneSettings {
 
   /**
    * The settings in config, checked, as the API takes them.
+   *
+   * The error page's included.
    *
    * @return array<string, mixed>
    *   Values by API name.
@@ -61,6 +160,12 @@ final class PullZoneSettings {
       catch (\InvalidArgumentException $e) {
         $errors[] = $e->getMessage();
       }
+    }
+    try {
+      $values += $this->errorPage();
+    }
+    catch (\InvalidArgumentException $e) {
+      $errors[] = $e->getMessage();
     }
     if ($errors !== []) {
       throw new \InvalidArgumentException(implode("\n", $errors));

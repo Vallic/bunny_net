@@ -1,0 +1,14 @@
+# Apps and decoupled front ends calling JSON:API, REST or Simple OAuth's token
+# endpoint are not browsers either. Narrow the patterns to what the site
+# serves; authentication still applies.
+description: API clients skip Shield's challenge and bot detection
+order: 7
+action: DisableShieldChallenge
+match: MatchAny
+triggers:
+  - type: Url
+    patterns: ['*/jsonapi/*', '*/oauth/token']
+  - type: UrlQueryString
+    patterns: ['*_format=json*', '*_format=hal_json*']
+extra_actions:
+  - action: DisableShieldBotDetection

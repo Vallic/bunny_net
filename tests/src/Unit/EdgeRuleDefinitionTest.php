@@ -73,6 +73,30 @@ final class EdgeRuleDefinitionTest extends UnitTestCase {
   }
 
   /**
+   * An order is sent as the OrderIndex, and only then compared.
+   */
+  public function testOrder(): void {
+    $file = [
+      'description' => 'Early',
+      'order' => 5,
+      'action' => 'BlockRequest',
+      'triggers' => [['type' => 'Url', 'patterns' => ['*']]],
+    ];
+    $definition = EdgeRuleDefinition::fromYaml($file, 'early.yml');
+    $returned = EdgeRuleDefinition::toApi($definition, 'early', 'abc');
+
+    $this->assertSame(5, $returned['OrderIndex']);
+    $this->assertSame($definition, EdgeRuleDefinition::fromYaml(EdgeRuleDefinition::toYaml($definition), 'export'));
+    $remote = EdgeRuleDefinition::fromApi($returned);
+    $this->assertTrue(EdgeRuleDefinition::matches($definition, $remote, $returned));
+    $this->assertFalse(EdgeRuleDefinition::matches($definition, $remote, ['OrderIndex' => 9] + $returned), 'Moved.');
+
+    $unordered = EdgeRuleDefinition::fromYaml(['order' => NULL] + $file, 'early.yml');
+    $this->assertTrue(EdgeRuleDefinition::matches($unordered, $remote, ['OrderIndex' => 9] + $returned), "Without an order, the rule's place is bunny.net's.");
+    $this->assertArrayNotHasKey('OrderIndex', EdgeRuleDefinition::toApi($unordered, 'early'));
+  }
+
+  /**
    * Values bunny.net added after the toolkit was generated pass as numbers.
    */
   public function testUnknownValuesStayNumbers(): void {
@@ -120,6 +144,7 @@ final class EdgeRuleDefinitionTest extends UnitTestCase {
       'typo in a key' => [['action' => 'BlockRequest', 'trigers' => $trigger], 'unknown key(s) trigers'],
       'too many parameters' => [['parameters' => ['a', 'b', 'c', 'd']] + $block, 'parameters takes at most 3 values'],
       'enabled as text' => [['enabled' => 'yes'] + $block, 'enabled must be true or false'],
+      'negative order' => [['order' => -1] + $block, 'order must be a whole number, 0 or more'],
     ];
   }
 

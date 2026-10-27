@@ -63,7 +63,12 @@ final class PullZoneSettingsTest extends BunnyNetKernelTestBase {
       ['update', 'LogFormat', 'Plain', 'Json'],
       ['send', 'CacheControlBrowserMaxAgeOverride', NULL, 900],
     ], array_map(
-      static fn(PullZoneSettingChange $change): array => [$change->operation, $change->key, $change->current, $change->configured],
+      static fn(PullZoneSettingChange $change): array => [
+        $change->operation,
+        $change->key,
+        $change->current,
+        $change->configured,
+      ],
       $changes,
     ));
     $this->assertSame(1, $changes[4]->value);
@@ -104,6 +109,57 @@ final class PullZoneSettingsTest extends BunnyNetKernelTestBase {
       $this->assertSame("EnableCookieVary must be true or false.\nNope is not a pull zone setting.", $e->getMessage());
     }
     $this->assertSame([], $this->sentRequests());
+  }
+
+  /**
+   * The error page file is sent as bunny.net's custom error page.
+   */
+  public function testErrorPage(): void {
+    $page = dirname(__DIR__, 3) . '/examples/error-page.html';
+    $this->config('bunny_net.settings')
+      ->set('pull_zone_settings', [])
+      ->set('error_page', ['file' => $page, 'whitelabel' => TRUE])
+      ->save();
+    $this->answerJson([
+      'Id' => self::PULL_ZONE,
+      'ErrorPageEnableCustomCode' => FALSE,
+      'ErrorPageCustomCode' => NULL,
+      'ErrorPageWhitelabel' => FALSE,
+    ]);
+
+    $changes = $this->settings()->plan();
+
+    $keys = array_map(static fn(PullZoneSettingChange $change): string => $change->key, $changes);
+    $this->assertSame(['ErrorPageEnableCustomCode', 'ErrorPageCustomCode', 'ErrorPageWhitelabel'], $keys);
+    $this->assertStringContainsString('{{status_code}}', (string) $changes[1]->value);
+    $this->assertTrue($this->settings()->isConfigured());
+
+    $this->config('bunny_net.settings')->set('error_page.file', 'missing.html')->save();
+    $this->expectExceptionMessage('missing.html is missing or empty.');
+    $this->settings()->values();
+  }
+
+  /**
+   * The error page can't also be set in pull_zone_settings.
+   */
+  public function testErrorPageInBothPlaces(): void {
+    $this->config('bunny_net.settings')
+      ->set('pull_zone_settings', ['ErrorPageWhitelabel' => FALSE])
+      ->set('error_page.file', dirname(__DIR__, 3) . '/examples/error-page.html')
+      ->save();
+
+    $this->expectExceptionMessage('pull_zone_settings sets ErrorPageWhitelabel, which error_page.file sets');
+    $this->settings()->values();
+  }
+
+  /**
+   * The recommended settings are ones the API takes, with their reasons.
+   */
+  public function testRecommended(): void {
+    foreach (PullZoneSettings::RECOMMENDED as $key => [$value, $reason]) {
+      $this->assertSame($value, PullZoneSettings::toApi($key, $value), $key);
+      $this->assertNotSame('', $reason);
+    }
   }
 
   /**

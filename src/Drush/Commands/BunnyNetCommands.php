@@ -183,7 +183,7 @@ final class BunnyNetCommands extends DrushCommands {
   public function zoneSync(array $options = ['dry-run' => FALSE]): void {
     $changes = $this->pullZoneSettings->plan();
     if ($changes === []) {
-      $this->io()->warning(dt('No pull_zone_settings in bunny_net.settings.'));
+      $this->io()->warning(dt('No pull_zone_settings or error page in bunny_net.settings.'));
       return;
     }
     foreach ($changes as $change) {
@@ -206,6 +206,65 @@ final class BunnyNetCommands extends DrushCommands {
     }
     $ignored = $this->pullZoneSettings->apply($changes);
     $this->io()->success(dt('Sent @count setting(s).', ['@count' => count($pending)]));
+    if ($ignored !== []) {
+      $this->io()->warning(dt('bunny.net kept other values for: @keys', ['@keys' => implode(', ', $ignored)]));
+    }
+  }
+
+  /**
+   * Syncs the pull zone's settings, caching and Edge Rules in one go.
+   *
+   * What bunny:zone-sync, bunny:caching-sync and bunny:rules-sync each do,
+   * in that order, for a deploy script: each part runs only where it is
+   * configured, every change is shown, and one answer applies them all.
+   *
+   * @param array{dry-run: bool, prune: bool} $options
+   *   The command options.
+   */
+  #[CLI\Command(name: 'bunny:sync', aliases: ['bunny-sync'])]
+  #[CLI\Option(name: 'dry-run', description: 'Show the changes without making them.')]
+  #[CLI\Option(name: 'prune', description: 'Delete managed Edge Rules whose file is gone.')]
+  #[CLI\Usage(name: 'drush bunny:sync -y', description: 'Bring the pull zone in line with config after a deploy.')]
+  public function sync(array $options = ['dry-run' => FALSE, 'prune' => FALSE]): void {
+    $hasRules = (string) $this->configFactory->get('bunny_net.settings')->get('edge_rules.directory') !== '';
+    if (!$this->pullZoneSettings->isConfigured() && !$this->cachingSync->isEnabled() && !$hasRules) {
+      $this->io()->warning(dt('Nothing to sync: no pull_zone_settings or error page, caching is not managed here, and there is no Edge Rules directory.'));
+      return;
+    }
+    $settings = array_values(array_filter($this->pullZoneSettings->plan(), static fn(PullZoneSettingChange $change): bool => $change->isChange()));
+    $caching = $this->cachingSync->isEnabled() ? $this->cachingSync->plan() : NULL;
+    $rules = [];
+    if ($hasRules) {
+      $rules = array_values(array_filter($this->edgeRuleSync->plan(), static fn(EdgeRuleChange $change): bool => $change->isChange() && ($change->operation !== EdgeRuleChange::DELETE || $options['prune'])));
+    }
+
+    $lines = [
+      ...array_map(static fn(PullZoneSettingChange $change): string => sprintf('setting  %s: %s', $change->key, self::inline($change->configured)), $settings),
+      ...array_map(static fn(string $line): string => 'caching  ' . $line, $caching?->describe() ?? []),
+      ...array_map(static fn(EdgeRuleChange $change): string => sprintf('rule     %s %s', $change->operation, $change->name), $rules),
+    ];
+    if ($lines === []) {
+      $this->io()->success(dt('Pull zone @zone is in sync.', ['@zone' => $this->configFactory->get('bunny_net.settings')->get('pull_zone_id')]));
+      return;
+    }
+    foreach ($lines as $line) {
+      $this->io()->writeln('  ' . $line);
+    }
+    if ($options['dry-run'] || !$this->io()->confirm(dt('Apply @count change(s) to pull zone @zone?', [
+      '@count' => count($lines),
+      '@zone' => $this->configFactory->get('bunny_net.settings')->get('pull_zone_id'),
+    ]))) {
+      return;
+    }
+
+    $ignored = $settings === [] ? [] : $this->pullZoneSettings->apply($settings);
+    if ($caching !== NULL && !$caching->isEmpty()) {
+      $this->cachingSync->apply($caching);
+    }
+    foreach ($rules as $change) {
+      $this->edgeRuleSync->apply($change);
+    }
+    $this->io()->success(dt('Applied @count change(s).', ['@count' => count($lines)]));
     if ($ignored !== []) {
       $this->io()->warning(dt('bunny.net kept other values for: @keys', ['@keys' => implode(', ', $ignored)]));
     }
@@ -239,6 +298,35 @@ final class BunnyNetCommands extends DrushCommands {
     }
     $this->cachingSync->apply($plan);
     $this->io()->success(dt('Applied @count change(s).', ['@count' => count($plan->describe())]));
+  }
+
+  /**
+   * Prints the settings recommended for Drupal, or saves them to config.
+   *
+   * Each comes with the reason. Saved, they join pull_zone_settings, and
+   * settings already there keep their value; bunny:zone-sync sends them.
+   *
+   * @param array{save: bool} $options
+   *   The command options.
+   */
+  #[CLI\Command(name: 'bunny:zone-recommend', aliases: ['bunny-zr'])]
+  #[CLI\Option(name: 'save', description: 'Add them to pull_zone_settings in the active config, keeping values already set.')]
+  #[CLI\Usage(name: 'drush bunny:zone-recommend --save && drush bunny:zone-sync --dry-run', description: 'Adopt the recommendations and see what they would change.')]
+  public function zoneRecommend(array $options = ['save' => FALSE]): void {
+    $configured = $this->pullZoneSettings->configured();
+    $this->io()->writeln('pull_zone_settings:');
+    foreach (PullZoneSettings::RECOMMENDED as $key => [$value, $reason]) {
+      $this->io()->writeln('  # ' . $reason);
+      $kept = array_key_exists($key, $configured) && $configured[$key] !== $value ? ' # configured: ' . self::inline($configured[$key]) : '';
+      $this->io()->writeln(sprintf('  %s: %s%s', $key, self::inline($value), $kept));
+    }
+    $this->io()->writeln('  # VerifyOriginSSL: true, once the origin has a certificate for the public hostname: with AddHostHeader, bunny.net asks the origin for the visitor\'s domain.');
+    if (!$options['save']) {
+      return;
+    }
+    $added = array_diff_key(array_map(static fn(array $recommended): bool => $recommended[0], PullZoneSettings::RECOMMENDED), $configured);
+    $this->configFactory->getEditable('bunny_net.settings')->set('pull_zone_settings', [...$configured, ...$added])->save();
+    $this->io()->success(dt('Added @count setting(s); export the config to keep them, and run drush bunny:zone-sync to send them.', ['@count' => count($added)]));
   }
 
   /**
@@ -276,9 +364,12 @@ final class BunnyNetCommands extends DrushCommands {
   }
 
   /**
-   * A value on one line.
+   * A value on one line; a long text, such as the error page, shortened.
    */
   private static function inline(mixed $value): string {
+    if (is_string($value) && mb_strlen($value) > 60) {
+      return sprintf('"%s…" (%d characters)', str_replace(["\r", "\n"], ' ', mb_substr($value, 0, 40)), mb_strlen($value));
+    }
     return (string) json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
   }
 

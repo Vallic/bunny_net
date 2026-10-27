@@ -1,0 +1,8 @@
+# Scanners looking for other software. Drupal has none of these, so they are
+# answered at the edge instead of by PHP.
+description: Block probes for WordPress and leaked files
+order: 8
+action: BlockRequest
+triggers:
+  - type: Url
+    patterns: ['*/wp-login.php', '*/xmlrpc.php', '*/wp-admin/*', '*/.env', '*/.git/*']

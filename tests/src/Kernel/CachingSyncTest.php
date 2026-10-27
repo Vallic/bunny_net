@@ -83,6 +83,27 @@ final class CachingSyncTest extends BunnyNetKernelTestBase {
   }
 
   /**
+   * Another rule at one of the caching rules' places stops the sync.
+   */
+  public function testOtherRulesInTheCachingPlaces(): void {
+    $this->config('bunny_net.settings')->set('caching.enabled', TRUE)->save();
+    $this->answerJson([
+      'Id' => self::PULL_ZONE,
+      'EdgeRules' => [
+        [
+          'Guid' => 'ours',
+          'Description' => CachingSync::PREFIX . 'never cache what the origin marks private',
+          'OrderIndex' => 20,
+        ],
+        ['Guid' => 'theirs', 'Description' => 'Redirect old blog', 'OrderIndex' => 30],
+      ],
+    ]);
+
+    $this->expectExceptionMessage('"Redirect old blog" at 30');
+    $this->sync()->plan();
+  }
+
+  /**
    * A setting can't be kept both in pull_zone_settings and in caching.
    */
   public function testConflictsWithPullZoneSettings(): void {

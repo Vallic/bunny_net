@@ -36,6 +36,25 @@ drush en bunny_net
 
 ## Configuration
 
+### What is managed where
+
+| What | Set in | Written to the pull zone by | Found again by |
+|---|---|---|---|
+| Caching settings and rules | the settings page, kept as `caching` in config | the page's *Save and apply* button, `drush bunny:caching-sync` | descriptions starting `bunny_net: ` |
+| Any other Edge Rules | YAML files in the rules directory | `drush bunny:rules-sync` | `[bunny_net:<file name>]` at the end of the description |
+| Any pull zone setting | `pull_zone_settings` in config, shown on the settings page | `drush bunny:zone-sync` | its bunny.net API name |
+| The 502/504 error page | an HTML file, named as `error_page.file` on the settings page | `drush bunny:zone-sync`, with the settings | its bunny.net API names |
+| Edge Scripts (middleware) | files in the repository, listed under `edge_scripts` | `drush bunny:script-deploy` | the script ID |
+
+`drush bunny:sync` runs the pull zone settings, caching and Edge Rules
+syncs, in that order, after one confirmation. Each part runs only where it is
+configured; Edge Scripts are deployed separately. All of it is in exported config or the
+repository, so every environment can be brought to the same setup.
+
+The three never change each other's rules, and none changes a rule made in the
+bunny.net dashboard. A setting can be in `pull_zone_settings` or set by
+caching, not both: the sync refuses it and the settings page says which.
+
 ### API key
 
 The key opens your whole bunny.net account, so it lives in `settings.php`, not
@@ -126,7 +145,9 @@ its own `Valicm\BunnyToolkit\Purge\RateLimiter\RateLimiter`.
 | `bunny:purge-all` | `bunny-pa` | Empty the whole pull zone. |
 | `bunny:zone-sync` | `bunny-zs` | Sync the pull zone's settings with config. `--dry-run`. |
 | `bunny:zone-export [keys]` | `bunny-ze` | Print the pull zone's settings as config YAML. `--save`. |
+| `bunny:zone-recommend` | `bunny-zr` | Print the settings a Drupal site wants, with the reasons. `--save` adds them to `pull_zone_settings`. |
 | `bunny:caching-sync` | `bunny-cs` | Write the caching settings and their Edge Rules to the pull zone. `--dry-run`. |
+| `bunny:sync` | `bunny-sync` | Pull zone settings, caching and Edge Rules in one go, after one confirmation; `-y` for deploy scripts. `--dry-run`, `--prune`. |
 | `bunny:script-deploy [names]` | `bunny-sd` | Deploy Edge Scripts that changed. `--force`, `--no-publish`. |
 | `bunny:rules-sync` | `bunny-rs` | Sync Edge Rules with the rules directory. `--dry-run`, `--prune`. |
 | `bunny:rules-export [dir]` | `bunny-re` | Write the pull zone's rules as YAML files. `--overwrite`. |
@@ -167,6 +188,53 @@ To start from what the pull zone has today, run
 `drush bunny:zone-export EnableCookieVary,CookieVaryParameters --save` with the
 settings you want to manage, or `drush bunny:zone-export all` to see them all,
 then export the config.
+
+### Recommended for Drupal
+
+`drush bunny:zone-recommend` prints the settings a Drupal site behind
+bunny.net wants, each with its reason; `--save` adds them to
+`pull_zone_settings`, keeping any already set there, for `bunny:zone-sync` to
+send:
+
+| Setting | Value | Why |
+|---|---|---|
+| `AddHostHeader` | `true` | Drupal builds links and checks `trusted_host_patterns` from the Host header. |
+| `FollowRedirects` | `false` | Followed at the edge, Drupal's redirects serve the page under the wrong URL. |
+| `DisableCookies` | `false` | Strips `Set-Cookie`, so nobody can log in through the CDN. New pull zones have it on. |
+| `CacheErrorResponses` | `false` | With stale caching, one cached 503 can outlast the outage. |
+| `IgnoreQueryStrings` | `false` | Pagers and search results would all get the first cached page. |
+| `UseStaleWhileUpdating`, `UseStaleWhileOffline` | `true` | The cached page instead of a wait or an error. |
+
+`VerifyOriginSSL` is worth turning on once the origin has a certificate for
+the public hostname: with `AddHostHeader`, bunny.net asks the origin for the
+visitor's domain, and fails if the origin only has a certificate for its own.
+
+Limits for the whole zone, such as `MonthlyBandwidthLimit`,
+`ConnectionLimitPerIPCount` or `RequestLimit`, are pull zone settings too.
+Limits for single paths, such as the login form, belong to Shield's rate
+limiting, set in the bunny.net dashboard.
+
+### Error page
+
+bunny.net shows its own page when it can't reach the site, a 502 or 504. To
+show the site's own, keep it as an HTML file in the repository and name it on
+the settings page, or in config:
+
+```yaml
+error_page:
+  file: ../bunny/error-page.html
+  whitelabel: true
+```
+
+`drush bunny:zone-sync` sends it with the other settings, as bunny.net's
+custom error page, without bunny.net's name when `whitelabel` is on. It can't
+also be set in `pull_zone_settings`.
+
+The page is shown while Drupal is down, so nothing on it can come from the
+site: inline the CSS and a logo as SVG, or load them from elsewhere.
+bunny.net fills in `{{status_code}}`, `{{status_title}}`,
+`{{status_description}}`, `{{target_hostname}}` and `{{user_ip}}`.
+`examples/error-page.html` is the page vallic.com uses, to start from.
 
 ## Caching
 
@@ -273,6 +341,7 @@ extra_actions:
 | Key | Default | Values |
 |---|---|---|
 | `description` | `''` | Shown in the bunny.net dashboard. |
+| `order` | none | The rule's place among the zone's rules, bunny.net's `OrderIndex`. Left out, bunny.net places it and syncs leave it there. |
 | `enabled` | `true` | |
 | `action` | required | An `EdgeRuleActionType` case, such as `Redirect`, `BlockRequest`, `SetResponseHeader`, `OverrideCacheTime`. |
 | `parameters` | `[]` | Up to three action parameters. |
@@ -301,7 +370,32 @@ before making the changes.
 To start from what is in the dashboard today, run
 `drush bunny:rules-export ../bunny/rules`, review the files, then sync.
 
-Rule order is not managed yet.
+### Order
+
+bunny.net runs rules from the lowest `order` up. For a cache time, a browser
+time and Shield's switches only the first matching rule counts; header
+actions all apply. Give `order` to a rule that has to come before or after
+others. bunny.net refuses two rules at one place.
+
+With caching managed, its rules take 20 to 45: a file with an `order` in that
+range fails, and a caching sync stops while another rule holds one of those
+places. Rules that should win over caching go below 20, rules that should
+come after it above 45.
+
+### Example rules
+
+`examples/edge-rules` holds rules to copy:
+
+- **Shield exemptions.** With Shield on the pull zone, servers calling
+  Drupal can't solve a challenge or pass bot detection. The examples take
+  payment webhooks (`/payment/notify/*`), the cron URL and API clients
+  (JSON:API, REST, Simple OAuth's token endpoint) out of both, and nothing
+  else: Shield's WAF still inspects them.
+- **Probes.** Blocks scanners looking for WordPress, `.env` and `.git` at the
+  edge.
+
+Shield itself, its WAF and bot detection, is set up in the bunny.net
+dashboard.
 
 ## Maintainers
 

@@ -27,7 +27,8 @@ use Valicm\BunnyToolkit\Caching\ZoneCaching;
  *
  * The rules' descriptions start with "bunny_net: ", which is how a sync
  * finds them again; other rules on the zone are left alone. They take the
- * order indexes 20 to 45.
+ * order indexes FIRST_ORDER to LAST_ORDER, and a sync stops when another
+ * rule holds one of them.
  */
 final class CachingSync {
 
@@ -35,6 +36,16 @@ final class CachingSync {
    * What starts each caching rule's description.
    */
   public const string PREFIX = 'bunny_net: ';
+
+  /**
+   * The first of the order indexes the caching rules take.
+   */
+  public const int FIRST_ORDER = 20;
+
+  /**
+   * The last of them.
+   */
+  public const int LAST_ORDER = 45;
 
   public function __construct(
     private readonly BunnyClientFactory $clientFactory,
@@ -111,6 +122,10 @@ final class CachingSync {
     }
     $zone = $this->clientFactory->get()->core()->pullZone()->getPullZone($this->pullZoneId());
     $zone = is_array($zone) ? $zone : [];
+    $taken = $this->taken($zone);
+    if ($taken !== []) {
+      throw new \InvalidArgumentException(sprintf('Other rules hold the caching rules\' places (%d to %d), and bunny.net refuses two rules at one: %s. Give them another order.', self::FIRST_ORDER, self::LAST_ORDER, implode(', ', $taken)));
+    }
     $choices = $this->choices();
     $settings = [];
     foreach ($this->caching()->properties($choices) as $key => $value) {
@@ -137,6 +152,27 @@ final class CachingSync {
       $core->pullZone()->updatePullZone($this->pullZoneId(), $settings);
     }
     $plan->rules->apply($core, $this->pullZoneId());
+  }
+
+  /**
+   * Other rules on the zone at the caching rules' places.
+   *
+   * @param array<mixed> $zone
+   *   The pull zone, as bunny.net returns it.
+   *
+   * @return list<string>
+   *   Their descriptions and places.
+   */
+  private function taken(array $zone): array {
+    $taken = [];
+    foreach (is_array($zone['EdgeRules'] ?? NULL) ? $zone['EdgeRules'] : [] as $rule) {
+      $description = is_array($rule) && is_string($rule['Description'] ?? NULL) ? $rule['Description'] : '';
+      $order = is_array($rule) && is_numeric($rule['OrderIndex'] ?? NULL) ? (int) $rule['OrderIndex'] : NULL;
+      if ($order !== NULL && $order >= self::FIRST_ORDER && $order <= self::LAST_ORDER && !str_starts_with($description, self::PREFIX)) {
+        $taken[] = sprintf('"%s" at %d', $description, $order);
+      }
+    }
+    return $taken;
   }
 
   /**

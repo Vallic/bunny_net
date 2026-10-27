@@ -18,6 +18,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[CoversClass(CacheTags::class)]
 #[CoversFunction('bunny_net_update_11001')]
 #[CoversFunction('bunny_net_update_11003')]
+#[CoversFunction('bunny_net_update_11004')]
 #[RunTestsInSeparateProcesses]
 final class UpdateTest extends KernelTestBase {
 
@@ -75,6 +76,21 @@ final class UpdateTest extends KernelTestBase {
 
     $this->assertSame($installed, $this->config('bunny_net.settings')->get('caching'));
     $this->assertFalse($installed['enabled']);
+  }
+
+  /**
+   * A site from before the error page gets it empty, as a new site has.
+   */
+  public function testErrorPageUpdate(): void {
+    $this->installConfig(['bunny_net']);
+    $installed = $this->config('bunny_net.settings')->get('error_page');
+    $this->config('bunny_net.settings')->clear('error_page')->save();
+
+    $this->container->get('module_handler')->loadInclude('bunny_net', 'install');
+    bunny_net_update_11004();
+
+    $this->assertSame($installed, $this->config('bunny_net.settings')->get('error_page'));
+    $this->assertSame('', $installed['file']);
   }
 
 }

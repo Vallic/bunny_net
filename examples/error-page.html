@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>{{status_code}} · {{status_title}}</title>
+<style>
+  html,body{margin:0;background:#fff;color:#0C0B0B;-webkit-font-smoothing:antialiased}
+  body{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:64px 28px;box-sizing:border-box;
+       font-family:"Poppins","Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif}
+  main{width:100%;max-width:560px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:56px}
+  header a{line-height:0}
+  svg{height:38px;display:block}
+  .site{font-size:13px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;white-space:nowrap;line-height:1.4}
+  a{color:#168ECA;text-decoration:none}
+  a:hover{color:#117AB0}
+  .code{font-size:14px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#168ECA;margin-bottom:18px}
+  h1{font-weight:700;font-size:44px;line-height:1.1;letter-spacing:-.01em;margin:0 0 20px}
+  p{font-size:19px;line-height:1.8;letter-spacing:.02em;color:#2F2F2F;margin:0;text-wrap:pretty}
+  p.note{font-size:14px;color:#868686;margin-top:16px}
+  .ref{border-top:1px solid #EAEAEA;margin-top:44px;padding-top:16px;font-size:12px;line-height:1.9;color:#868686;
+       font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  @media (max-width:560px){h1{font-size:34px}p{font-size:17px}header{margin-bottom:40px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<a href="https://vallic.com/cloud"><svg viewBox="0 0 150 59" style="height:38px;display:block" role="img" aria-label="Vallic"><g><path d="M62.707,41.01l0,-17.361c0,-0.472 -0.26,-0.708 -0.78,-0.708l-8.431,0c-3.402,0 -5.102,1.748 -5.102,5.243l0,13.605c0,3.496 1.7,5.244 5.102,5.244l3.401,0c3.872,0 5.81,-2.008 5.81,-6.023m-7.44,12.045l-2.764,0c-3.496,0 -6.199,-0.967 -8.113,-2.905c-1.913,-1.937 -2.869,-4.629 -2.869,-8.078l0,-14.171c0,-3.495 0.956,-6.2 2.869,-8.113c1.914,-1.914 4.617,-2.869 8.113,-2.869l15.872,0c0.85,0 1.276,0.401 1.276,1.203l0,33.729c0,0.803 -0.426,1.204 -1.276,1.204l-4.464,0c-0.803,0 -1.204,-0.401 -1.204,-1.204l0,-2.551l-0.283,0c-1.134,2.504 -3.52,3.755 -7.157,3.755" style="fill:#403f41;fill-rule:nonzero"></path><path d="M84.53,53.055l-4.464,0c-0.804,0 -1.204,-0.401 -1.204,-1.204l0,-47.403c0,-0.804 0.4,-1.206 1.204,-1.206l4.464,0c0.802,0 1.204,0.402 1.204,1.206l0,47.403c0,0.803 -0.402,1.204 -1.204,1.204" style="fill:#403f41;fill-rule:nonzero"></path><path d="M101.039,53.055l-4.464,0c-0.803,0 -1.204,-0.401 -1.204,-1.204l0,-47.403c0,-0.804 0.401,-1.206 1.204,-1.206l4.464,0c0.803,0 1.205,0.402 1.205,1.206l0,47.403c0,0.803 -0.402,1.204 -1.205,1.204" style="fill:#403f41;fill-rule:nonzero"></path><path d="M117.619,3.313l-4.607,0c-0.755,0 -1.132,0.379 -1.132,1.135l0,6.447c0,0.804 0.377,1.205 1.132,1.205l4.607,0c0.755,0 1.134,-0.401 1.134,-1.205l0,-6.447c0,-0.756 -0.379,-1.135 -1.134,-1.135" style="fill:#168eca;fill-rule:nonzero"></path><path d="M117.548,16.919l-4.535,0c-0.756,0 -1.133,0.401 -1.133,1.203l0,33.729c0,0.803 0.4,1.204 1.204,1.204l4.535,0c0.425,0 0.72,-0.081 0.886,-0.247c0.165,-0.166 0.248,-0.484 0.248,-0.957l0,-33.729c0,-0.802 -0.402,-1.203 -1.205,-1.203" style="fill:#403f41;fill-rule:nonzero"></path><path d="M150,48.237l0,3.685c0,0.756 -0.425,1.134 -1.276,1.134l-10.416,0c-3.496,0 -6.199,-0.968 -8.112,-2.906c-1.914,-1.937 -2.87,-4.629 -2.87,-8.078l0,-14.171c0,-3.495 0.956,-6.2 2.87,-8.113c1.913,-1.913 4.616,-2.869 8.112,-2.869l10.416,0c0.851,0 1.276,0.401 1.276,1.204l0,3.684c0,0.757 -0.425,1.134 -1.276,1.134l-9.424,0c-3.401,0 -5.101,1.748 -5.101,5.243l0,13.605c0,3.496 1.7,5.244 5.101,5.244l9.424,0c0.851,0 1.276,0.402 1.276,1.204" style="fill:#403f41;fill-rule:nonzero"></path><path d="M21.606,37.447l10.863,-37.447l9.077,0l-17.015,54.234c-0.914,2.474 -2.533,3.712 -4.863,3.712c-2.43,0 -3.075,-1.775 -3.075,-3.712l5.013,-16.787l0,0Z" style="fill:#403f41;fill-rule:nonzero"></path><path d="M25.631,0.312l-20.429,0l-5.202,0l13.112,42.371l4.376,-14.811l-6.409,-20.407l12.587,0l1.965,-7.153l0,0Z" style="fill:#168eca;fill-rule:nonzero"></path></g></svg></a>
+<a class="site" href="https://vallic.com/cloud">Vallic Cloud</a>
+</header>
+<div class="code">{{status_code}} · {{status_title}}</div>
+<h1>The site is not answering right now.</h1>
+<p>{{status_description}}</p>
+<p class="note">The content delivery network in front of {{target_hostname}} could not get an answer from the site. Try again in a moment.</p>
+<div class="ref">{{status_code}} &middot; {{target_hostname}}<br>Your address: {{user_ip}}</div>
+</main>
+</body>
+</html>

@@ -1,0 +1,11 @@
+# Payment providers post to Drupal Commerce's notify URL from servers, which
+# can't solve a Shield challenge or pass bot detection. The gateway checks
+# each notification's signature itself.
+description: Payment webhooks skip Shield's challenge and bot detection
+order: 5
+action: DisableShieldChallenge
+triggers:
+  - type: Url
+    patterns: ['*/payment/notify/*']
+extra_actions:
+  - action: DisableShieldBotDetection
