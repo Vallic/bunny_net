@@ -29,7 +29,7 @@ final class SettingsFormTest extends BrowserTestBase {
   protected $defaultTheme = 'stark';
 
   /**
-   * Scripts and rules are listed from config, without secret values.
+   * Settings, scripts and rules are listed from config, without secrets.
    */
   public function testEdgeOverview(): void {
     $fixtures = dirname(__DIR__, 2) . '/fixtures';
@@ -43,6 +43,7 @@ final class SettingsFormTest extends BrowserTestBase {
         'gone' => ['script_id' => 78, 'file' => $fixtures . '/scripts/gone.ts'],
       ])
       ->set('edge_rules.directory', $fixtures . '/missing-rules')
+      ->set('pull_zone_settings', ['CookieVaryParameters' => ['my_role'], 'EnableCookieVaryy' => TRUE])
       ->save();
     $this->writeSettings([
       'settings' => [
@@ -68,11 +69,14 @@ final class SettingsFormTest extends BrowserTestBase {
     $this->assertSession()->pageTextNotContains('s3cret');
     $this->assertSession()->pageTextContains('gone.ts (not found)');
     $this->assertSession()->pageTextContains('missing-rules does not exist.');
+    $this->assertSession()->pageTextContains('CookieVaryParameters ["my_role"]');
+    $this->assertSession()->pageTextContains('EnableCookieVaryy is not a pull zone setting. Did you mean EnableCookieVary?');
 
     $this->submitForm(['pull_zone_id' => 4321], 'Save configuration');
     $this->assertSession()->pageTextContains('The configuration options have been saved.');
     $this->assertSame(4321, $this->config('bunny_net.settings')->get('pull_zone_id'));
     $this->assertCount(2, $this->config('bunny_net.settings')->get('edge_scripts'), 'Scripts are left as they were.');
+    $this->assertCount(2, $this->config('bunny_net.settings')->get('pull_zone_settings'), 'Pull zone settings are left as they were.');
 
     $this->config('bunny_net.settings')->set('edge_rules.directory', $fixtures . '/rules')->save();
     $this->drupalGet('admin/config/services/bunny-net');

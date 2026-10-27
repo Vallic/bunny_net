@@ -1,4 +1,5 @@
 pull_zone_id: 0
+pull_zone_settings: {}
 purge:
   enabled: false
   mode: terminate

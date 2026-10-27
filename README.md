@@ -6,6 +6,8 @@ Connects Drupal to the [bunny.net](https://bunny.net) CDN:
   cache tag, for example on a node save, the pages carrying it are purged.
 - **Purging** everything in the pull zone, or individual URLs, from Drush or
   the admin UI.
+- **Pull zone settings**, such as cookie vary and stale caching, kept in config
+  and synced to the pull zone.
 - **Edge Scripts** (pull zone middleware) deployed from files in your
   repository.
 - **Edge Rules** kept as YAML files in your repository and synced to the pull
@@ -60,6 +62,7 @@ $config['bunny_net.settings']['purge']['enabled'] = TRUE;
 | Setting | Default | What it does |
 |---|---|---|
 | `pull_zone_id` | `0` | The pull zone to purge. |
+| `pull_zone_settings` | `{}` | See below. |
 | `purge.enabled` | `false` | Purge when Drupal invalidates cache tags. |
 | `purge.mode` | `terminate` | `terminate` purges after the response is sent and queues what the rate limits defer; `queue` leaves everything to cron. |
 | `purge.concurrency` | `10` | Purge requests sent at once, 1 to 50. bunny.net takes one tag per request; each still waits for the rate limit. |
@@ -109,9 +112,48 @@ channel and not retried.
 | `bunny:purge-tags <tags>` | `bunny-pt` | Purge pages carrying the given cache tags (comma-separated). |
 | `bunny:purge-url <urls>` | `bunny-pu` | Purge URLs; a `*` purges everything under it. |
 | `bunny:purge-all` | `bunny-pa` | Empty the whole pull zone. |
+| `bunny:zone-sync` | `bunny-zs` | Sync the pull zone's settings with config. `--dry-run`. |
+| `bunny:zone-export [keys]` | `bunny-ze` | Print the pull zone's settings as config YAML. `--save`. |
 | `bunny:script-deploy [names]` | `bunny-sd` | Deploy Edge Scripts that changed. `--force`, `--no-publish`. |
 | `bunny:rules-sync` | `bunny-rs` | Sync Edge Rules with the rules directory. `--dry-run`, `--prune`. |
 | `bunny:rules-export [dir]` | `bunny-re` | Write the pull zone's rules as YAML files. `--overwrite`. |
+
+## Pull zone settings
+
+Settings from the bunny.net dashboard can be kept in the exported
+`bunny_net.settings`, under their bunny.net API names, so every environment's
+pull zone is set up the same way:
+
+```yaml
+pull_zone_settings:
+  EnableCookieVary: true
+  CookieVaryParameters: [my_role]
+  IgnoreQueryStrings: false
+  UseStaleWhileUpdating: true
+  UseStaleWhileOffline: true
+  OriginRetries: 1
+  OriginRetry5XXResponses: true
+  LogFormat: Json
+```
+
+`drush bunny:zone-sync` shows the settings that differ, then asks before sending
+them. Settings left out of config are not touched, so the rest can still be
+managed in the dashboard.
+
+- The names are those of bunny.net's update pull zone API, as in the toolkit's
+  `PullZoneSettingsModel`. A misspelt name or a value of the wrong type fails
+  the sync and the settings page shows why.
+- Enum settings, such as `LogFormat`, take the case names of the toolkit's
+  enums in `Valicm\BunnyToolkit\Api\Core\Enum`, or a number.
+- `AWSSigningKey`, `AWSSigningSecret` and `LogForwardingToken` hold
+  credentials, so they are refused; set them in the dashboard.
+- bunny.net does not return a few settings, such as
+  `CacheControlBrowserMaxAgeOverride`, so those are sent on every sync.
+
+To start from what the pull zone has today, run
+`drush bunny:zone-export EnableCookieVary,CookieVaryParameters --save` with the
+settings you want to manage, or `drush bunny:zone-export all` to see them all,
+then export the config.
 
 ## Edge Scripts
 

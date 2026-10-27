@@ -8,13 +8,17 @@ use Drupal\bunny_net\CachePurger;
 use Drupal\bunny_net\EdgeRule\EdgeRuleChange;
 use Drupal\bunny_net\EdgeRule\EdgeRuleSync;
 use Drupal\bunny_net\EdgeScript\ScriptDeployer;
+use Drupal\bunny_net\PullZone\PullZoneSettingChange;
+use Drupal\bunny_net\PullZone\PullZoneSettings;
+use Drupal\Component\Serialization\Yaml;
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drush\Attributes as CLI;
 use Drush\Commands\DrushCommands;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Valicm\BunnyToolkit\Purge\PurgeResult;
 
 /**
- * Drush commands for purging, Edge Script deploys and Edge Rule syncs.
+ * Drush commands for purging, deploys and syncs of the pull zone's setup.
  */
 final class BunnyNetCommands extends DrushCommands {
 
@@ -27,6 +31,8 @@ final class BunnyNetCommands extends DrushCommands {
     private readonly CachePurger $purger,
     private readonly ScriptDeployer $scriptDeployer,
     private readonly EdgeRuleSync $edgeRuleSync,
+    private readonly PullZoneSettings $pullZoneSettings,
+    private readonly ConfigFactoryInterface $configFactory,
   ) {
     parent::__construct();
   }
@@ -39,6 +45,8 @@ final class BunnyNetCommands extends DrushCommands {
       $container->get('bunny_net.purger'),
       $container->get('bunny_net.script_deployer'),
       $container->get('bunny_net.edge_rule_sync'),
+      $container->get('bunny_net.pull_zone_settings'),
+      $container->get('config.factory'),
     );
   }
 
@@ -156,6 +164,89 @@ final class BunnyNetCommands extends DrushCommands {
     }
     $written = array_filter($statuses, static fn(string $status): bool => $status === 'written');
     $this->io()->success(dt('Exported @count rule(s).', ['@count' => count($written)]));
+  }
+
+  /**
+   * Syncs the pull zone's settings with pull_zone_settings in config.
+   *
+   * Shows the settings that differ and asks before sending them. Settings
+   * left out of config are not touched.
+   *
+   * @param array{dry-run: bool} $options
+   *   The command options.
+   */
+  #[CLI\Command(name: 'bunny:zone-sync', aliases: ['bunny-zs'])]
+  #[CLI\Option(name: 'dry-run', description: 'Show the changes without making them.')]
+  public function zoneSync(array $options = ['dry-run' => FALSE]): void {
+    $changes = $this->pullZoneSettings->plan();
+    if ($changes === []) {
+      $this->io()->warning(dt('No pull_zone_settings in bunny_net.settings.'));
+      return;
+    }
+    foreach ($changes as $change) {
+      $this->io()->writeln(match ($change->operation) {
+        PullZoneSettingChange::UPDATE => sprintf('  %-9s %s: %s -> %s', $change->operation, $change->key, self::inline($change->current), self::inline($change->configured)),
+        PullZoneSettingChange::UNREADABLE => sprintf('  %-9s %s: %s (bunny.net does not return it)', $change->operation, $change->key, self::inline($change->configured)),
+        default => sprintf('  %-9s %s: %s', $change->operation, $change->key, self::inline($change->configured)),
+      });
+    }
+    $pending = array_filter($changes, static fn(PullZoneSettingChange $change): bool => $change->isChange());
+    if ($pending === []) {
+      $this->io()->success(dt('Pull zone settings are in sync.'));
+      return;
+    }
+    if ($options['dry-run'] || !$this->io()->confirm(dt('Send @count setting(s) to pull zone @zone?', [
+      '@count' => count($pending),
+      '@zone' => $this->configFactory->get('bunny_net.settings')->get('pull_zone_id'),
+    ]))) {
+      return;
+    }
+    $ignored = $this->pullZoneSettings->apply($changes);
+    $this->io()->success(dt('Sent @count setting(s).', ['@count' => count($pending)]));
+    if ($ignored !== []) {
+      $this->io()->warning(dt('bunny.net kept other values for: @keys', ['@keys' => implode(', ', $ignored)]));
+    }
+  }
+
+  /**
+   * Prints the pull zone's settings as pull_zone_settings YAML.
+   *
+   * A starting point for config: copy the settings to manage, or save them
+   * to the active config with --save and export it.
+   *
+   * @param string $keys
+   *   Comma-separated setting names.
+   * @param array{save: bool} $options
+   *   The command options.
+   */
+  #[CLI\Command(name: 'bunny:zone-export', aliases: ['bunny-ze'])]
+  #[CLI\Argument(name: 'keys', description: 'Comma-separated settings, by bunny.net API name; the configured ones when left out, or all with "all".')]
+  #[CLI\Option(name: 'save', description: 'Save the values to pull_zone_settings in the active config.')]
+  #[CLI\Usage(name: 'drush bunny:zone-export EnableCookieVary,CookieVaryParameters --save', description: 'Start managing cookie vary from config.')]
+  public function zoneExport(string $keys = '', array $options = ['save' => FALSE]): void {
+    $names = match ($keys) {
+      '' => array_map(strval(...), array_keys($this->pullZoneSettings->configured())),
+      'all' => [],
+      default => self::split($keys),
+    };
+    if ($names === [] && $keys !== 'all') {
+      $this->io()->warning(dt('No pull_zone_settings in bunny_net.settings: name the settings to export, or "all".'));
+      return;
+    }
+    $values = $this->pullZoneSettings->export($names);
+    $this->io()->writeln(Yaml::encode(['pull_zone_settings' => $values]));
+    if ($options['save']) {
+      $config = $this->configFactory->getEditable('bunny_net.settings');
+      $config->set('pull_zone_settings', [...$this->pullZoneSettings->configured(), ...$values])->save();
+      $this->io()->success(dt('Saved @count setting(s); export the config to keep them.', ['@count' => count($values)]));
+    }
+  }
+
+  /**
+   * A value on one line.
+   */
+  private static function inline(mixed $value): string {
+    return (string) json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
   }
 
   /**

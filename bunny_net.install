@@ -26,3 +26,13 @@ function bunny_net_update_11001(): string {
 
   return (string) t('Installed Cache Purifier and moved the tag blocklist to it.');
 }
+
+/**
+ * Adds pull zone settings, kept in config and synced with Drush.
+ */
+function bunny_net_update_11002(): void {
+  $settings = \Drupal::configFactory()->getEditable('bunny_net.settings');
+  if ($settings->get('pull_zone_settings') === NULL) {
+    $settings->set('pull_zone_settings', [])->save();
+  }
+}

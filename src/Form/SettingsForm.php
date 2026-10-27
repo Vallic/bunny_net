@@ -8,6 +8,7 @@ use Drupal\bunny_net\CachePurger;
 use Drupal\bunny_net\EdgeRule\EdgeRuleSync;
 use Drupal\bunny_net\EdgeScript\ScriptDeployer;
 use Drupal\bunny_net\NotConfiguredException;
+use Drupal\bunny_net\PullZone\PullZoneSettings;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Form\ConfigFormBase;
@@ -19,9 +20,9 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 /**
  * The pull zone, cache tag and purge settings.
  *
- * Edge Scripts and Edge Rules are files in the site's repository, deployed
- * with Drush, so they are set in the exported bunny_net.settings and only
- * shown here.
+ * Pull zone settings, Edge Scripts and Edge Rules are deployed with Drush
+ * from the exported bunny_net.settings and files in the site's repository,
+ * so they are only shown here.
  */
 final class SettingsForm extends ConfigFormBase {
 
@@ -31,6 +32,7 @@ final class SettingsForm extends ConfigFormBase {
     protected ScriptDeployer $scriptDeployer,
     protected EdgeRuleSync $edgeRuleSync,
     protected QueueFactory $queueFactory,
+    protected PullZoneSettings $pullZoneSettings,
   ) {
     parent::__construct($configFactory, $typedConfigManager);
   }
@@ -45,6 +47,7 @@ final class SettingsForm extends ConfigFormBase {
       $container->get('bunny_net.script_deployer'),
       $container->get('bunny_net.edge_rule_sync'),
       $container->get('queue'),
+      $container->get('bunny_net.pull_zone_settings'),
     );
   }
 
@@ -159,10 +162,47 @@ final class SettingsForm extends ConfigFormBase {
       '#markup' => $this->t('Which tags are written and purged is set in Cache Purifier: its blocklist, aliases and buckets, and its rules for who and what may purge.'),
     ];
 
+    $form['pull_zone_settings'] = $this->pullZoneSettings();
     $form['edge_scripts'] = $this->edgeScripts();
     $form['edge_rules'] = $this->edgeRules();
 
     return parent::buildForm($form, $form_state);
+  }
+
+  /**
+   * The pull zone settings kept in config.
+   *
+   * @return array<string, mixed>
+   *   The render array.
+   */
+  private function pullZoneSettings(): array {
+    $rows = [];
+    foreach ($this->pullZoneSettings->configured() as $key => $value) {
+      $rows[] = [$key, (string) json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)];
+    }
+    $element = [
+      '#type' => 'details',
+      '#title' => $this->t('Pull zone settings'),
+      '#open' => TRUE,
+      '#description' => $this->t('Settings such as cookie vary, stale caching and origin retries, by their bunny.net API names, synced to the pull zone with <code>drush bunny:zone-sync</code>. Set them as <code>pull_zone_settings</code> in the exported <code>bunny_net.settings</code>; <code>drush bunny:zone-export</code> prints the current values. Settings left out are managed in the bunny.net dashboard.'),
+      'settings' => [
+        '#type' => 'table',
+        '#header' => [$this->t('Setting'), $this->t('Value')],
+        '#rows' => $rows,
+        '#empty' => $this->t('None configured.'),
+      ],
+    ];
+    try {
+      $this->pullZoneSettings->values();
+    }
+    catch (\InvalidArgumentException $e) {
+      $element['errors'] = [
+        '#theme' => 'item_list',
+        '#title' => $this->t('Not valid, so a sync would fail'),
+        '#items' => explode("\n", $e->getMessage()),
+      ];
+    }
+    return $element;
   }
 
   /**

@@ -5,6 +5,11 @@ bunny_net.settings:
     pull_zone_id:
       type: integer
       label: 'Pull zone ID'
+    pull_zone_settings:
+      type: sequence
+      label: 'Pull zone settings, by bunny.net API name'
+      sequence:
+        type: bunny_net.pull_zone_setting
     purge:
       type: mapping
       label: 'Purging'
@@ -66,3 +71,9 @@ bunny_net.settings:
         directory:
           type: string
           label: 'Directory of rule files, relative to the Drupal root'
+
+# A boolean, number, string, list or mapping, depending on the setting;
+# PullZoneSettings checks each against the toolkit's PullZoneSettingsModel.
+bunny_net.pull_zone_setting:
+  type: ignore
+  label: 'Pull zone setting'
