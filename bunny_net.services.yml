@@ -13,9 +13,15 @@ services:
     # version without Cache Purifier; the update installs it.
     arguments: ['@config.factory', '@?cache_purifier.outbound']
 
+  # Counts Bunny's purge limits across processes where the site has Redis.
+  # Replace it to count other purges on the same account with this site's.
+  bunny_net.rate_limiter:
+    class: Drupal\bunny_net\PurgeRateLimiter
+    arguments: ['@logger.channel.bunny_net']
+
   bunny_net.purger:
     class: Drupal\bunny_net\CachePurger
-    arguments: ['@bunny_net.client_factory', '@bunny_net.cache_tags', '@config.factory', '@queue', '@logger.channel.bunny_net']
+    arguments: ['@bunny_net.client_factory', '@bunny_net.cache_tags', '@config.factory', '@queue', '@logger.channel.bunny_net', '@bunny_net.rate_limiter']
 
   # Every cache tag invalidation passes through here, so it takes no
   # dependencies until a request that invalidated something ends.

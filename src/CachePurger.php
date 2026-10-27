@@ -8,6 +8,7 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Queue\QueueFactory;
 use Psr\Log\LoggerInterface;
 use Valicm\BunnyToolkit\Purge\PurgeResult;
+use Valicm\BunnyToolkit\Purge\RateLimiter\RateLimiter;
 
 /**
  * Purges the site's pull zone, queueing what bunny.net's rate limits defer.
@@ -33,6 +34,7 @@ final class CachePurger {
     private readonly ConfigFactoryInterface $configFactory,
     private readonly QueueFactory $queueFactory,
     private readonly LoggerInterface $logger,
+    private readonly RateLimiter $rateLimiter,
   ) {}
 
   /**
@@ -156,7 +158,8 @@ final class CachePurger {
     }
     $purger = $this->clientFactory->get()->purger(
       $this->cacheTags->format(),
-      maxWait: $maxWait,
+      $this->rateLimiter,
+      $maxWait,
       logger: $this->logger,
       concurrency: max(1, (int) $this->configFactory->get('bunny_net.settings')->get('purge.concurrency')),
     );

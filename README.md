@@ -105,6 +105,18 @@ The settings page shows how many purges are waiting. A purge that bunny.net
 rejects, for example because of a wrong API key, is logged to the `bunny_net`
 channel and not retried.
 
+Without more, each PHP process counts the limits for itself, so several web
+heads and queue runners together can send more than bunny.net allows and get
+429s back, which only delays purges. With the
+[Redis](https://www.drupal.org/project/redis) module connected (PhpRedis or
+Predis), the counts are kept in Redis or Valkey, under `bunny_net:purge:`, and
+shared by every process. If the server stops answering, a warning is logged and
+the process counts for itself again.
+
+Other code on the site that purges the same bunny.net account can draw on the
+same counts through the `bunny_net.rate_limiter` service, or replace it with
+its own `Valicm\BunnyToolkit\Purge\RateLimiter\RateLimiter`.
+
 ## Drush commands
 
 | Command | Alias | What it does |

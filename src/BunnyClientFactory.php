@@ -47,8 +47,6 @@ final class BunnyClientFactory {
   /**
    * The bunny.net client, shared for the request.
    *
-   * Sharing it means every purge in the request draws on one rate limiter.
-   *
    * @throws \Drupal\bunny_net\NotConfiguredException
    *   When settings.php holds no API key.
    */

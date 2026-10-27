@@ -16,6 +16,8 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Valicm\BunnyToolkit\CacheTag\HashedTagList;
+use Valicm\BunnyToolkit\Purge\PurgeType;
+use Valicm\BunnyToolkit\Purge\RateLimiter\RateLimiter;
 
 /**
  * Invalidated cache tags reach bunny.net once, or wait in the queue.
@@ -128,6 +130,33 @@ final class PurgeTest extends BunnyNetKernelTestBase {
 
     $this->assertSame(['CacheTag' => (new HashedTagList())->purgeValue('node:2')], $this->sentRequests()[3][1]);
     $this->assertSame(0, $this->queue()->numberOfItems());
+  }
+
+  /**
+   * Purges draw on bunny_net.rate_limiter, which a site can replace.
+   */
+  public function testPurgesDrawOnTheRateLimiterService(): void {
+    $this->container->set('bunny_net.rate_limiter', new class implements RateLimiter {
+
+      /**
+       * {@inheritdoc}
+       */
+      public function tryConsume(PurgeType $type): float {
+        return 30.0;
+      }
+
+      /**
+       * {@inheritdoc}
+       */
+      public function backOff(PurgeType $type, float $seconds): void {}
+
+    });
+
+    $result = $this->container->get('bunny_net.purger')->purgeTags(['node:1']);
+
+    $this->assertCount(0, $this->sent, 'The limiter had no tokens.');
+    $this->assertSame(['node:1'], $result->deferred);
+    $this->assertSame(1, $this->queue()->numberOfItems());
   }
 
   /**
