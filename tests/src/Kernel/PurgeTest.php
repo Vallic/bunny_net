@@ -151,6 +151,8 @@ final class PurgeTest extends BunnyNetKernelTestBase {
       public function backOff(PurgeType $type, float $seconds): void {}
 
     });
+    // Built in setUp() with the limiter it had then.
+    $this->container->set('bunny_net.purger', NULL);
 
     $result = $this->container->get('bunny_net.purger')->purgeTags(['node:1']);
 

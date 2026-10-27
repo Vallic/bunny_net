@@ -17,6 +17,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('bunny_net')]
 #[CoversClass(CacheTags::class)]
 #[CoversFunction('bunny_net_update_11001')]
+#[CoversFunction('bunny_net_update_11003')]
 #[RunTestsInSeparateProcesses]
 final class UpdateTest extends KernelTestBase {
 
@@ -59,6 +60,21 @@ final class UpdateTest extends KernelTestBase {
     $cacheTags = $this->container->get('bunny_net.cache_tags');
     $this->assertInstanceOf(CacheTags::class, $cacheTags);
     $this->assertSame(['node:1'], $cacheTags->filter(['node:1', 'commerce_order:5']));
+  }
+
+  /**
+   * A site from before caching settings gets them, off, as a new site has.
+   */
+  public function testCachingUpdate(): void {
+    $this->installConfig(['bunny_net']);
+    $installed = $this->config('bunny_net.settings')->get('caching');
+    $this->config('bunny_net.settings')->clear('caching')->save();
+
+    $this->container->get('module_handler')->loadInclude('bunny_net', 'install');
+    bunny_net_update_11003();
+
+    $this->assertSame($installed, $this->config('bunny_net.settings')->get('caching'));
+    $this->assertFalse($installed['enabled']);
   }
 
 }

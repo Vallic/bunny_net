@@ -83,4 +83,35 @@ final class SettingsFormTest extends BrowserTestBase {
     $this->assertSession()->pageTextContains('rules: 2 rules.');
   }
 
+  /**
+   * Caching is chosen on the form and saved as lists in config.
+   */
+  public function testCaching(): void {
+    $this->drupalLogin($this->drupalCreateUser(['administer bunny_net']));
+    $this->drupalGet('admin/config/services/bunny-net');
+
+    $this->submitForm([
+      'caching[enabled]' => TRUE,
+      'caching[skip_paths]' => "/cart/*\n/",
+    ], 'Save configuration');
+    $this->assertSession()->pageTextContains('These are not paths that can skip the cache: /.');
+
+    $this->submitForm([
+      'caching[enabled]' => TRUE,
+      'caching[vary][webp]' => TRUE,
+      'caching[skip_paths]' => "/cart/*\n\n/checkout ",
+      'caching[session_cookies]' => 'shop_session',
+      'caching[browser_pages]' => '900',
+    ], 'Save configuration');
+    $this->assertSession()->pageTextContains('The configuration options have been saved.');
+    $caching = $this->config('bunny_net.settings')->get('caching');
+    $this->assertTrue($caching['enabled']);
+    $this->assertSame(['webp'], $caching['vary']);
+    $this->assertSame(['/cart/*', '/checkout'], $caching['skip_paths']);
+    $this->assertSame(['shop_session'], $caching['session_cookies']);
+    $this->assertSame(900, $caching['browser_pages']);
+    $this->assertSame(0, $caching['browser_files']);
+    $this->assertSession()->fieldValueEquals('caching[skip_paths]', "/cart/*\n/checkout");
+  }
+
 }

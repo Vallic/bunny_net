@@ -36,3 +36,24 @@ function bunny_net_update_11002(): void {
     $settings->set('pull_zone_settings', [])->save();
   }
 }
+
+/**
+ * Adds caching settings, written to the pull zone with Drush.
+ */
+function bunny_net_update_11003(): void {
+  $settings = \Drupal::configFactory()->getEditable('bunny_net.settings');
+  if ($settings->get('caching') === NULL) {
+    $settings->set('caching', [
+      'enabled' => FALSE,
+      'dynamic' => FALSE,
+      'vary' => [],
+      'vary_headers' => [],
+      'vary_cookies' => [],
+      'blocked_countries' => [],
+      'skip_paths' => [],
+      'session_cookies' => [],
+      'browser_pages' => 0,
+      'browser_files' => 0,
+    ])->save();
+  }
+}

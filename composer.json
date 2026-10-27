@@ -14,7 +14,7 @@
     "require": {
         "php": ">=8.3",
         "drupal/cache_purifier": "^1.0",
-        "valicm/bunny-toolkit": "^1.0.0-alpha4"
+        "valicm/bunny-toolkit": "^1.0.0-alpha5"
     },
     "require-dev": {
         "predis/predis": "^2.3"

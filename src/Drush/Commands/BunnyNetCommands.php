@@ -8,6 +8,7 @@ use Drupal\bunny_net\CachePurger;
 use Drupal\bunny_net\EdgeRule\EdgeRuleChange;
 use Drupal\bunny_net\EdgeRule\EdgeRuleSync;
 use Drupal\bunny_net\EdgeScript\ScriptDeployer;
+use Drupal\bunny_net\PullZone\CachingSync;
 use Drupal\bunny_net\PullZone\PullZoneSettingChange;
 use Drupal\bunny_net\PullZone\PullZoneSettings;
 use Drupal\Component\Serialization\Yaml;
@@ -33,6 +34,7 @@ final class BunnyNetCommands extends DrushCommands {
     private readonly EdgeRuleSync $edgeRuleSync,
     private readonly PullZoneSettings $pullZoneSettings,
     private readonly ConfigFactoryInterface $configFactory,
+    private readonly CachingSync $cachingSync,
   ) {
     parent::__construct();
   }
@@ -47,6 +49,7 @@ final class BunnyNetCommands extends DrushCommands {
       $container->get('bunny_net.edge_rule_sync'),
       $container->get('bunny_net.pull_zone_settings'),
       $container->get('config.factory'),
+      $container->get('bunny_net.caching_sync'),
     );
   }
 
@@ -206,6 +209,36 @@ final class BunnyNetCommands extends DrushCommands {
     if ($ignored !== []) {
       $this->io()->warning(dt('bunny.net kept other values for: @keys', ['@keys' => implode(', ', $ignored)]));
     }
+  }
+
+  /**
+   * Syncs the pull zone's caching with caching in config.
+   *
+   * Shows the settings and Edge Rules that differ and asks before sending
+   * them. Rules not written by this command are left alone.
+   *
+   * @param array{dry-run: bool} $options
+   *   The command options.
+   */
+  #[CLI\Command(name: 'bunny:caching-sync', aliases: ['bunny-cs'])]
+  #[CLI\Option(name: 'dry-run', description: 'Show the changes without making them.')]
+  public function cachingSync(array $options = ['dry-run' => FALSE]): void {
+    $plan = $this->cachingSync->plan();
+    foreach ($plan->describe() as $line) {
+      $this->io()->writeln('  ' . $line);
+    }
+    if ($plan->isEmpty()) {
+      $this->io()->success(dt('Caching is in sync.'));
+      return;
+    }
+    if ($options['dry-run'] || !$this->io()->confirm(dt('Apply @count change(s) to pull zone @zone?', [
+      '@count' => count($plan->describe()),
+      '@zone' => $this->configFactory->get('bunny_net.settings')->get('pull_zone_id'),
+    ]))) {
+      return;
+    }
+    $this->cachingSync->apply($plan);
+    $this->io()->success(dt('Applied @count change(s).', ['@count' => count($plan->describe())]));
   }
 
   /**

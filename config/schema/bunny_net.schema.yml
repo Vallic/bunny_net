@@ -71,6 +71,74 @@ bunny_net.settings:
         directory:
           type: string
           label: 'Directory of rule files, relative to the Drupal root'
+    caching:
+      type: mapping
+      label: 'Caching, written to the pull zone with drush bunny:caching-sync'
+      mapping:
+        enabled:
+          type: boolean
+          label: 'Manage the pull zone''s caching from here'
+        dynamic:
+          type: boolean
+          label: 'Let bunny.net decide what is cacheable (Smart Cache)'
+        vary:
+          type: sequence
+          label: 'What the cache varies on'
+          sequence:
+            type: string
+            label: 'Vary'
+            constraints:
+              Choice:
+                choices:
+                  - webp
+                  - avif
+                  - mobile
+                  - country
+                  - country_state
+                  - hostname
+                  - cookie
+        vary_headers:
+          type: sequence
+          label: 'Request headers the cache varies on'
+          sequence:
+            type: string
+            label: 'Header'
+        vary_cookies:
+          type: sequence
+          label: 'Cookies the cookie vary is keyed on'
+          sequence:
+            type: string
+            label: 'Cookie'
+        blocked_countries:
+          type: sequence
+          label: 'Countries answered with a 403'
+          sequence:
+            type: string
+            label: 'ISO 3166-1 alpha-2 code'
+        skip_paths:
+          type: sequence
+          label: 'Paths never cached'
+          sequence:
+            type: string
+            label: 'Path'
+        session_cookies:
+          type: sequence
+          label: 'Session cookies besides Drupal''s, or the start of their names'
+          sequence:
+            type: string
+            label: 'Cookie'
+        browser_pages:
+          type: integer
+          label: 'Seconds browsers keep a page; 0 leaves it to Drupal'
+          constraints:
+            Choice:
+              choices: [0, 300, 900, 3600, 86400]
+        browser_files:
+          type: integer
+          label: 'Seconds browsers keep a static file; 0 leaves it to Drupal'
+          constraints:
+            Choice:
+              choices: [0, 86400, 604800, 2592000]
 
 # A boolean, number, string, list or mapping, depending on the setting;
 # PullZoneSettings checks each against the toolkit's PullZoneSettingsModel.

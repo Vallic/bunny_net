@@ -11,3 +11,14 @@ tags:
 edge_scripts: {}
 edge_rules:
   directory: ''
+caching:
+  enabled: false
+  dynamic: false
+  vary: []
+  vary_headers: []
+  vary_cookies: []
+  blocked_countries: []
+  skip_paths: []
+  session_cookies: []
+  browser_pages: 0
+  browser_files: 0

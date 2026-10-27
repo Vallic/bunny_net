@@ -126,6 +126,7 @@ its own `Valicm\BunnyToolkit\Purge\RateLimiter\RateLimiter`.
 | `bunny:purge-all` | `bunny-pa` | Empty the whole pull zone. |
 | `bunny:zone-sync` | `bunny-zs` | Sync the pull zone's settings with config. `--dry-run`. |
 | `bunny:zone-export [keys]` | `bunny-ze` | Print the pull zone's settings as config YAML. `--save`. |
+| `bunny:caching-sync` | `bunny-cs` | Write the caching settings and their Edge Rules to the pull zone. `--dry-run`. |
 | `bunny:script-deploy [names]` | `bunny-sd` | Deploy Edge Scripts that changed. `--force`, `--no-publish`. |
 | `bunny:rules-sync` | `bunny-rs` | Sync Edge Rules with the rules directory. `--dry-run`, `--prune`. |
 | `bunny:rules-export [dir]` | `bunny-re` | Write the pull zone's rules as YAML files. `--overwrite`. |
@@ -166,6 +167,51 @@ To start from what the pull zone has today, run
 `drush bunny:zone-export EnableCookieVary,CookieVaryParameters --save` with the
 settings you want to manage, or `drush bunny:zone-export all` to see them all,
 then export the config.
+
+## Caching
+
+The **Caching** section of the settings page sets what bunny.net caches, for
+sites that don't handle it in their own Edge Rules or middleware. Turn on
+*Manage the pull zone's caching from here*, choose, save, then either press
+*Save and apply caching to the pull zone* or run `drush bunny:caching-sync`
+(after a config import on deploy, for example). The choices are kept in the
+exported `bunny_net.settings` under `caching`.
+
+Whatever is chosen, two rules are always written:
+
+- A response Drupal marks `private`, `no-cache` or `no-store` is never
+  cached, and the browser is told so.
+- A visitor with a Drupal session (`SESS…` or `SSESS…`) gets pages from
+  Drupal, not from the cache, so an editor never sees the anonymous copy.
+  Stylesheets, scripts, images and fonts are still cached for them.
+
+The rest is chosen:
+
+- **Separate copies** per WebP or AVIF support, mobile or desktop, country,
+  region, hostname, or named cookies. Each one multiplies what is cached.
+- **Request headers** to vary by, such as `Accept-Language`.
+- **Countries to block**, answered with a 403.
+- **Paths never cached**, such as `/cart/*`, at bunny.net or in browsers.
+- **Other session cookies**, for a session Drupal doesn't set.
+- **Browser times** for pages and for static files. They replace the times
+  Drupal sends, never on a private response, and never for a page a visitor
+  with a session gets.
+- **Smart Cache**, which lets bunny.net decide what is cacheable.
+
+The rules are named `bunny_net: …` and take the order indexes 20 to 45; a
+sync leaves other rules alone, including those from the Edge Rules directory.
+Settings set here can't also be in `pull_zone_settings`: the settings page
+and the sync say which.
+
+The rules come from the toolkit's `Caching\ZoneCaching`, which other code
+can use to write the same rules to any pull zone.
+
+### With middleware
+
+Middleware and these rules can run on the same pull zone, but bunny.net
+doesn't document their order within a stage, so give each concern one
+owner. If a middleware script bypasses the cache for sessions or paths
+itself, leave those choices empty here.
 
 ## Edge Scripts
 
