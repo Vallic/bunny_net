@@ -6,6 +6,7 @@ namespace Drupal\bunny_net\EdgeRule;
 
 use Drupal\bunny_net\BunnyClientFactory;
 use Drupal\bunny_net\NotConfiguredException;
+use Drupal\bunny_net\Paths;
 use Drupal\bunny_net\PullZone\CachingSync;
 use Drupal\Component\Serialization\Yaml;
 use Drupal\Core\Config\ConfigFactoryInterface;
@@ -23,6 +24,11 @@ use Drupal\Core\Config\ConfigFactoryInterface;
  */
 final class EdgeRuleSync {
 
+  /**
+   * The rules directory, relative to the Drupal root, by default.
+   */
+  public const string DIRECTORY = Paths::DIRECTORY . '/rules';
+
   public function __construct(
     private readonly BunnyClientFactory $clientFactory,
     private readonly ConfigFactoryInterface $configFactory,
@@ -30,17 +36,20 @@ final class EdgeRuleSync {
   ) {}
 
   /**
-   * The rules directory from config, as an absolute path.
+   * The rules directory as an absolute path.
    *
-   * @throws \Drupal\bunny_net\NotConfiguredException
-   *   When none is set.
+   * The one edge_rules.directory names, or DIRECTORY when it is empty.
    */
   public function directory(): string {
-    $directory = (string) $this->configFactory->get('bunny_net.settings')->get('edge_rules.directory');
-    if ($directory === '') {
-      throw new NotConfiguredException('No Edge Rules directory: set edge_rules.directory in bunny_net.settings.');
-    }
-    return str_starts_with($directory, '/') || str_contains($directory, '://') ? $directory : $this->appRoot . '/' . $directory;
+    $directory = trim((string) $this->configFactory->get('bunny_net.settings')->get('edge_rules.directory'));
+    return Paths::resolve($this->appRoot, $directory !== '' ? $directory : self::DIRECTORY);
+  }
+
+  /**
+   * Whether the site has a rules directory to sync.
+   */
+  public function hasDirectory(): bool {
+    return is_dir($this->directory());
   }
 
   /**

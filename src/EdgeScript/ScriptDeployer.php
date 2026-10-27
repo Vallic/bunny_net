@@ -6,6 +6,7 @@ namespace Drupal\bunny_net\EdgeScript;
 
 use Drupal\bunny_net\BunnyClientFactory;
 use Drupal\bunny_net\NotConfiguredException;
+use Drupal\bunny_net\Paths;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Site\Settings;
 
@@ -26,7 +27,8 @@ use Drupal\Core\Site\Settings;
  * $settings['bunny_net']['edge_script_secrets']['middleware']['SIGNING_KEY'] = getenv('BUNNY_SIGNING_KEY');
  * @endcode
  *
- * Files are relative to the Drupal root, like the config sync directory.
+ * Files are relative to the Drupal root, like the config sync directory. A
+ * script without one is read from Paths::DIRECTORY, as `<name>.ts`.
  */
 final class ScriptDeployer {
 
@@ -73,12 +75,12 @@ final class ScriptDeployer {
     $secrets = $this->secrets();
     $overview = [];
     foreach ($this->scripts() as $name => $script) {
-      $file = (string) ($script['file'] ?? '');
+      $file = $this->path((string) $name, $script);
       $overview[] = [
         'name' => (string) $name,
         'script_id' => (int) ($script['script_id'] ?? 0),
         'file' => $file,
-        'exists' => $file !== '' && is_file($this->path($file)),
+        'exists' => is_file($file),
         'variables' => array_keys(self::stringMap($script['variables'] ?? [])),
         'secrets' => array_keys(self::stringMap($secrets[$name] ?? [])),
       ];
@@ -110,7 +112,7 @@ final class ScriptDeployer {
     if ($scriptId <= 0) {
       throw new NotConfiguredException(sprintf('Edge Script "%s" has no script_id.', $name));
     }
-    $file = $this->path((string) ($script['file'] ?? ''));
+    $file = $this->path($name, $script);
     if (!is_file($file)) {
       throw new NotConfiguredException(sprintf('Edge Script "%s": %s does not exist.', $name, $file));
     }
@@ -158,10 +160,16 @@ final class ScriptDeployer {
   }
 
   /**
-   * An absolute path for a file from config.
+   * A script's file as an absolute path: as configured, or by its name.
+   *
+   * @param string $name
+   *   The script's name in config.
+   * @param array<string, mixed> $script
+   *   The script's config.
    */
-  private function path(string $file): string {
-    return $file === '' || str_starts_with($file, '/') || str_contains($file, '://') ? $file : $this->appRoot . '/' . $file;
+  private function path(string $name, array $script): string {
+    $file = is_string($script['file'] ?? NULL) ? trim($script['file']) : '';
+    return Paths::resolve($this->appRoot, $file !== '' ? $file : Paths::DIRECTORY . '/' . $name . '.ts');
   }
 
   /**

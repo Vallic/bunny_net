@@ -109,6 +109,16 @@ final class EdgeRuleSyncTest extends BunnyNetKernelTestBase {
   }
 
   /**
+   * Without edge_rules.directory, the rules are in the bunny folder.
+   */
+  public function testDefaultDirectory(): void {
+    $this->config('bunny_net.settings')->set('edge_rules.directory', '')->save();
+
+    $this->assertSame(dirname($this->root) . '/bunny/rules', $this->sync()->directory());
+    $this->assertFalse($this->sync()->hasDirectory(), 'Nothing to sync without it.');
+  }
+
+  /**
    * Changes go to the right endpoints.
    */
   public function testApply(): void {

@@ -1,5 +1,5 @@
 bunny_net.settings:
-  path: '/admin/config/services/bunny'
+  path: '/admin/config/development/bunny'
   defaults:
     _form: '\Drupal\bunny_net\Form\SettingsForm'
     _title: 'Bunny CDN'
@@ -7,7 +7,7 @@ bunny_net.settings:
     _permission: 'administer bunny_net'
 
 bunny_net.purge_all:
-  path: '/admin/config/services/bunny/purge'
+  path: '/admin/config/development/bunny/purge'
   defaults:
     _form: '\Drupal\bunny_net\Form\PurgeAllForm'
     _title: 'Purge everything'

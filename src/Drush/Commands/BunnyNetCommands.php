@@ -226,9 +226,9 @@ final class BunnyNetCommands extends DrushCommands {
   #[CLI\Option(name: 'prune', description: 'Delete managed Edge Rules whose file is gone.')]
   #[CLI\Usage(name: 'drush bunny:sync -y', description: 'Bring the pull zone in line with config after a deploy.')]
   public function sync(array $options = ['dry-run' => FALSE, 'prune' => FALSE]): void {
-    $hasRules = (string) $this->configFactory->get('bunny_net.settings')->get('edge_rules.directory') !== '';
+    $hasRules = $this->edgeRuleSync->hasDirectory();
     if (!$this->pullZoneSettings->isConfigured() && !$this->cachingSync->isEnabled() && !$hasRules) {
-      $this->io()->warning(dt('Nothing to sync: no pull_zone_settings or error page, caching is not managed here, and there is no Edge Rules directory.'));
+      $this->io()->warning(dt('Nothing to sync: no pull_zone_settings or error page, caching is not managed here, and there is no Edge Rules directory at @directory.', ['@directory' => $this->edgeRuleSync->directory()]));
       return;
     }
     $settings = array_values(array_filter($this->pullZoneSettings->plan(), static fn(PullZoneSettingChange $change): bool => $change->isChange()));

@@ -55,6 +55,23 @@ The three never change each other's rules, and none changes a rule made in the
 Bunny CDN dashboard. A setting can be in `pull_zone_settings` or set by
 caching, not both: the sync refuses it and the settings page says which.
 
+### Where files go
+
+What a site deploys to Bunny CDN lives in one folder beside the Drupal root,
+in the repository but outside the web root:
+
+```
+bunny/
+  error-page.html     the 502/504 page, sent with the pull zone settings
+  middleware.ts       an Edge Script, named middleware in edge_scripts
+  rules/              Edge Rules, one YAML file each
+web/                  the Drupal root
+```
+
+Nothing there is required: a missing file or folder is simply not synced.
+`edge_rules.directory`, an Edge Script's `file`, and
+`$settings['bunny_net']['error_page']` in `settings.php` name other places.
+
 ### API key
 
 The key opens your whole Bunny CDN account, so it lives in `settings.php`, not
@@ -66,8 +83,8 @@ $settings['bunny_net']['api_key'] = getenv('BUNNY_API_KEY');
 
 ### Pull zone and purging
 
-Set the pull zone ID under *Configuration → Web services → Bunny CDN*
-(`/admin/config/services/bunny`).
+Set the pull zone ID under *Configuration → Development → Bunny CDN*
+(`/admin/config/development/bunny`).
 
 Purging is **off** until you turn it on. Turn it on only in the environment
 that owns the pull zone, so a local or staging copy of production's config
@@ -89,7 +106,7 @@ $config['bunny_net.settings']['purge']['enabled'] = TRUE;
 | `tags.header` | `true` | Add the `CDN-Tag` header. |
 | `tags.prefix` | `''` | Prepended to every tag. Needed when several sites share a pull zone; give each site its own prefix. |
 | `edge_scripts` | `{}` | See below. |
-| `edge_rules.directory` | `''` | See below. |
+| `edge_rules.directory` | `''` | Empty reads the rules from `../bunny/rules`. See below. |
 
 Drupal only lets the CDN cache pages that it marks cacheable. Set *Browser and
 proxy cache maximum age* under *Configuration → Development → Performance*.
@@ -286,19 +303,32 @@ itself, leave those choices empty here.
 
 ## Edge Scripts
 
-List scripts in the exported `bunny_net.settings`. The settings page shows
-them, with whether each file exists and which variables and secrets are set,
-but they are edited in config, like the files they point to. Paths are
-relative to the Drupal root, like the config sync directory:
+List scripts in the exported `bunny_net.settings`, each with the ID of its
+script at Bunny CDN. Its code is read from `../bunny/<name>.ts`, or from the
+`file` given, relative to the Drupal root like the config sync directory. The
+settings page shows them, with the file each is read from, whether it exists,
+and which variables and secrets are set; they are edited in config.
 
 ```yaml
 edge_scripts:
   middleware:
     script_id: 1234
-    file: ../bunny/middleware.ts
+    # file: ../bunny/middleware.ts, the default for "middleware"
     variables:
       ORIGIN_HOST: www.example.com
 ```
+
+Config is needed here, unlike for the error page: a file can't say which
+script at Bunny CDN it is. The ID often differs per environment; set it in
+`settings.php` then, on top of the exported entry:
+
+```php
+$config['bunny_net.settings']['edge_scripts']['middleware']['script_id'] = (int) getenv('BUNNY_MIDDLEWARE_ID');
+```
+
+An override like that only adds to an entry config already has. On a site
+whose config has no `middleware` entry yet, before a config import, it makes
+one with the ID alone, which is read from the default file.
 
 Secrets go in `settings.php`:
 
@@ -313,8 +343,9 @@ never run on their own, so add the command to your deploy steps.
 
 ## Edge Rules
 
-Point `edge_rules.directory` in the exported `bunny_net.settings` at a
-directory of YAML files, one rule per file. The settings page shows the
+Keep the rules in `../bunny/rules`, one YAML file per rule, or name another
+directory as `edge_rules.directory` in the exported `bunny_net.settings`.
+Without the directory, nothing is synced. The settings page shows the
 directory and how many rules it holds, or what is wrong with a file:
 
 ```yaml
@@ -371,7 +402,8 @@ before making the changes.
 - A managed rule whose file was removed is deleted only with `--prune`.
 
 To start from what is in the dashboard today, run
-`drush bunny:rules-export ../bunny/rules`, review the files, then sync.
+`drush bunny:rules-export`, which writes to the rules directory, review the
+files, then sync.
 
 ### Order
 

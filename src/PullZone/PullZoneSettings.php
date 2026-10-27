@@ -6,6 +6,7 @@ namespace Drupal\bunny_net\PullZone;
 
 use Drupal\bunny_net\BunnyClientFactory;
 use Drupal\bunny_net\NotConfiguredException;
+use Drupal\bunny_net\Paths;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Site\Settings;
 
@@ -76,9 +77,9 @@ final class PullZoneSettings {
   /**
    * Where the error page is, relative to the Drupal root, by default.
    *
-   * Beside the Edge Rules and scripts, outside the web root.
+   * In the folder the Edge Rules and scripts are in (Paths).
    */
-  public const string ERROR_PAGE_FILE = '../bunny/error-page.html';
+  public const string ERROR_PAGE_FILE = Paths::DIRECTORY . '/error-page.html';
 
   public function __construct(
     private readonly BunnyClientFactory $clientFactory,
@@ -109,29 +110,7 @@ final class PullZoneSettings {
     $file = is_array($settings) && is_string($settings['error_page'] ?? NULL) && trim($settings['error_page']) !== ''
       ? trim($settings['error_page'])
       : self::ERROR_PAGE_FILE;
-    if (str_contains($file, '://')) {
-      return $file;
-    }
-    return self::resolve(str_starts_with($file, '/') ? $file : $this->appRoot . '/' . $file);
-  }
-
-  /**
-   * An absolute path without its "." and ".." segments.
-   *
-   * By the text, not the file system, so a file that doesn't exist yet
-   * reads as where it would go.
-   */
-  private static function resolve(string $path): string {
-    $parts = [];
-    foreach (explode('/', $path) as $part) {
-      if ($part === '..') {
-        array_pop($parts);
-      }
-      elseif ($part !== '' && $part !== '.') {
-        $parts[] = $part;
-      }
-    }
-    return '/' . implode('/', $parts);
+    return Paths::resolve($this->appRoot, $file);
   }
 
   /**

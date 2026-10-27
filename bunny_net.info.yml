@@ -3,7 +3,7 @@ type: module
 description: 'CDN-Tag headers, cache purging, Edge Script deploys and Edge Rules from code for Bunny CDN.'
 core_version_requirement: ^11.3 || ^12
 php: 8.3
-package: Web services
+package: Performance and scalability
 configure: bunny_net.settings
 dependencies:
   - cache_purifier:cache_purifier

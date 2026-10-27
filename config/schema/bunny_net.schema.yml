@@ -57,7 +57,7 @@ bunny_net.settings:
             label: 'Script ID'
           file:
             type: string
-            label: 'File, relative to the Drupal root'
+            label: 'File, relative to the Drupal root; empty for ../bunny/<name>.ts'
           variables:
             type: sequence
             label: 'Variables'
@@ -70,7 +70,7 @@ bunny_net.settings:
       mapping:
         directory:
           type: string
-          label: 'Directory of rule files, relative to the Drupal root'
+          label: 'Directory of rule files, relative to the Drupal root; empty for ../bunny/rules'
     caching:
       type: mapping
       label: 'Caching, written to the pull zone with drush bunny:caching-sync'

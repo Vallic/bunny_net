@@ -8,6 +8,7 @@ use Drupal\bunny_net\CachePurger;
 use Drupal\bunny_net\EdgeRule\EdgeRuleSync;
 use Drupal\bunny_net\EdgeScript\ScriptDeployer;
 use Drupal\bunny_net\NotConfiguredException;
+use Drupal\bunny_net\Paths;
 use Drupal\bunny_net\PullZone\CachingSync;
 use Drupal\bunny_net\PullZone\PullZoneSettings;
 use Drupal\Core\Config\ConfigFactoryInterface;
@@ -506,7 +507,7 @@ final class SettingsForm extends ConfigFormBase {
       $rows[] = [
         $script['name'],
         $script['script_id'] ?: $this->t('Missing'),
-        $script['exists'] ? $script['file'] : $this->t('@file (not found)', ['@file' => $script['file'] ?: '-']),
+        $script['exists'] ? $script['file'] : $this->t('@file (not found)', ['@file' => $script['file']]),
         implode(', ', $script['variables']) ?: '-',
         implode(', ', $script['secrets']) ?: '-',
       ];
@@ -515,7 +516,7 @@ final class SettingsForm extends ConfigFormBase {
       '#type' => 'details',
       '#title' => $this->t('Edge Scripts (middleware)'),
       '#open' => TRUE,
-      '#description' => $this->t("Code that runs on bunny.net in front of the site, deployed from files in the repository with <code>drush bunny:script-deploy</code>. List them under <code>edge_scripts</code> in the exported <code>bunny_net.settings</code>, and put their secrets in settings.php as <code>\$settings['bunny_net']['edge_script_secrets']</code>."),
+      '#description' => $this->t("Code that runs on bunny.net in front of the site, deployed from files in the repository with <code>drush bunny:script-deploy</code>. List each under <code>edge_scripts</code> in the exported <code>bunny_net.settings</code> with its script ID; its code is read from @directory/&lt;name&gt;.ts unless <code>file</code> names another. Put their secrets in settings.php as <code>\$settings['bunny_net']['edge_script_secrets']</code>.", ['@directory' => Paths::DIRECTORY]),
       'scripts' => [
         '#type' => 'table',
         '#header' => [
@@ -538,8 +539,11 @@ final class SettingsForm extends ConfigFormBase {
    *   The render array.
    */
   private function edgeRules(): array {
-    try {
-      $directory = $this->edgeRuleSync->directory();
+    $directory = $this->edgeRuleSync->directory();
+    if (!$this->edgeRuleSync->hasDirectory()) {
+      $status = $this->t('No directory at @directory, so no rules are synced.', ['@directory' => $directory]);
+    }
+    else {
       try {
         $count = count($this->edgeRuleSync->read($directory));
         $status = $this->formatPlural($count, '@directory: 1 rule.', '@directory: @count rules.', ['@directory' => $directory]);
@@ -548,14 +552,11 @@ final class SettingsForm extends ConfigFormBase {
         $status = $e->getMessage();
       }
     }
-    catch (NotConfiguredException) {
-      $status = $this->t('No directory configured.');
-    }
     return [
       '#type' => 'details',
       '#title' => $this->t('Edge Rules'),
       '#open' => TRUE,
-      '#description' => $this->t('Rules bunny.net applies to requests, such as redirects and blocks, kept as YAML files in the repository and synced with <code>drush bunny:rules-sync</code>. Set the directory as <code>edge_rules.directory</code> in the exported <code>bunny_net.settings</code>.'),
+      '#description' => $this->t('Rules bunny.net applies to requests, such as redirects and blocks, kept as YAML files in the repository and synced with <code>drush bunny:rules-sync</code>. They are read from @default, one rule per file; <code>edge_rules.directory</code> in the exported <code>bunny_net.settings</code> names another directory.', ['@default' => EdgeRuleSync::DIRECTORY]),
       'status' => [
         '#type' => 'item',
         '#title' => $this->t('Rules'),

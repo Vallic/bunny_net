@@ -80,6 +80,20 @@ final class ScriptDeployerTest extends BunnyNetKernelTestBase {
   }
 
   /**
+   * A script without a file is read from the bunny folder, by its name.
+   */
+  public function testDefaultFile(): void {
+    $this->config('bunny_net.settings')->set('edge_scripts', ['middleware' => ['script_id' => 77]])->save();
+
+    $overview = $this->deployer()->overview();
+
+    $this->assertSame(dirname($this->root) . '/bunny/middleware.ts', $overview[0]['file']);
+    $this->assertFalse($overview[0]['exists']);
+    $this->expectExceptionMessage('bunny/middleware.ts does not exist.');
+    $this->deployer()->deploy('middleware');
+  }
+
+  /**
    * An unknown script name fails before anything is sent.
    */
   public function testUnknownScript(): void {
