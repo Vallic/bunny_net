@@ -18,7 +18,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[CoversClass(CacheTags::class)]
 #[CoversFunction('bunny_net_update_11001')]
 #[CoversFunction('bunny_net_update_11003')]
-#[CoversFunction('bunny_net_update_11004')]
+#[CoversFunction('bunny_net_update_11005')]
 #[RunTestsInSeparateProcesses]
 final class UpdateTest extends KernelTestBase {
 
@@ -79,18 +79,22 @@ final class UpdateTest extends KernelTestBase {
   }
 
   /**
-   * A site from before the error page gets it empty, as a new site has.
+   * The error_page settings 11004 added are removed again.
    */
-  public function testErrorPageUpdate(): void {
+  public function testErrorPageSettingsRemoved(): void {
     $this->installConfig(['bunny_net']);
-    $installed = $this->config('bunny_net.settings')->get('error_page');
-    $this->config('bunny_net.settings')->clear('error_page')->save();
+    // As 11004 stored them; the keys are no longer in the schema.
+    $storage = $this->container->get('config.storage');
+    $old = $storage->read('bunny_net.settings');
+    $this->assertIsArray($old);
+    $old['error_page'] = ['file' => '', 'whitelabel' => TRUE];
+    $storage->write('bunny_net.settings', $old);
+    $this->container->get('config.factory')->reset('bunny_net.settings');
 
     $this->container->get('module_handler')->loadInclude('bunny_net', 'install');
-    bunny_net_update_11004();
+    bunny_net_update_11005();
 
-    $this->assertSame($installed, $this->config('bunny_net.settings')->get('error_page'));
-    $this->assertSame('', $installed['file']);
+    $this->assertNull($this->config('bunny_net.settings')->get('error_page'));
   }
 
 }

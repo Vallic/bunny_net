@@ -1,6 +1,6 @@
-# bunny.net
+# Bunny CDN
 
-Connects Drupal to the [bunny.net](https://bunny.net) CDN:
+Connects Drupal to [Bunny CDN](https://bunny.net):
 
 - **Cache tags.** Responses get a `CDN-Tag` header. When Drupal invalidates a
   cache tag, for example on a node save, the pages carrying it are purged.
@@ -13,7 +13,7 @@ Connects Drupal to the [bunny.net](https://bunny.net) CDN:
 - **Edge Rules** kept as YAML files in your repository and synced to the pull
   zone.
 
-It talks to bunny.net through
+It talks to Bunny CDN through
 [valicm/bunny-toolkit](https://github.com/valicm/bunny-toolkit), which handles
 Bunny's purge rate limits.
 
@@ -21,7 +21,7 @@ Bunny's purge rate limits.
 
 - Drupal 11.3 or later, or Drupal 12
 - PHP 8.3 or later
-- A bunny.net account API key and a pull zone
+- A Bunny CDN account API key and a pull zone
 - [Cache Purifier](https://www.drupal.org/project/cache_purifier) 1.0 or
   later, which decides which tags are written and purged
 
@@ -42,8 +42,8 @@ drush en bunny_net
 |---|---|---|---|
 | Caching settings and rules | the settings page, kept as `caching` in config | the page's *Save and apply* button, `drush bunny:caching-sync` | descriptions starting `bunny_net: ` |
 | Any other Edge Rules | YAML files in the rules directory | `drush bunny:rules-sync` | `[bunny_net:<file name>]` at the end of the description |
-| Any pull zone setting | `pull_zone_settings` in config, shown on the settings page | `drush bunny:zone-sync` | its bunny.net API name |
-| The 502/504 error page | an HTML file, named as `error_page.file` on the settings page | `drush bunny:zone-sync`, with the settings | its bunny.net API names |
+| Any pull zone setting | `pull_zone_settings` in config, shown on the settings page | `drush bunny:zone-sync` | its Bunny CDN API name |
+| The 502/504 error page | an HTML file at `../bunny/error-page.html` | `drush bunny:zone-sync`, with the settings | its Bunny CDN API names |
 | Edge Scripts (middleware) | files in the repository, listed under `edge_scripts` | `drush bunny:script-deploy` | the script ID |
 
 `drush bunny:sync` runs the pull zone settings, caching and Edge Rules
@@ -52,12 +52,12 @@ configured; Edge Scripts are deployed separately. All of it is in exported confi
 repository, so every environment can be brought to the same setup.
 
 The three never change each other's rules, and none changes a rule made in the
-bunny.net dashboard. A setting can be in `pull_zone_settings` or set by
+Bunny CDN dashboard. A setting can be in `pull_zone_settings` or set by
 caching, not both: the sync refuses it and the settings page says which.
 
 ### API key
 
-The key opens your whole bunny.net account, so it lives in `settings.php`, not
+The key opens your whole Bunny CDN account, so it lives in `settings.php`, not
 in config:
 
 ```php
@@ -84,7 +84,7 @@ $config['bunny_net.settings']['purge']['enabled'] = TRUE;
 | `pull_zone_settings` | `{}` | See below. |
 | `purge.enabled` | `false` | Purge when Drupal invalidates cache tags. |
 | `purge.mode` | `terminate` | `terminate` purges after the response is sent and queues what the rate limits defer; `queue` leaves everything to cron. |
-| `purge.concurrency` | `10` | Purge requests sent at once, 1 to 50. bunny.net takes one tag per request; each still waits for the rate limit. |
+| `purge.concurrency` | `10` | Purge requests sent at once, 1 to 50. Bunny CDN takes one tag per request; each still waits for the rate limit. |
 | `purge.on_cache_rebuild` | `false` | Empty the pull zone on every cache rebuild, such as `drush cr` at the end of a deploy. |
 | `tags.header` | `true` | Add the `CDN-Tag` header. |
 | `tags.prefix` | `''` | Prepended to every tag. Needed when several sites share a pull zone; give each site its own prefix. |
@@ -96,7 +96,7 @@ proxy cache maximum age* under *Configuration → Development → Performance*.
 
 ### How cache tags are written
 
-Only public responses get a `CDN-Tag` header; bunny.net caches no others.
+Only public responses get a `CDN-Tag` header; Bunny CDN caches no others.
 
 Which tags are written and purged is Cache Purifier's outbound policy: its
 blocklist, aliases and buckets, and the order that puts list tags first. Its
@@ -120,19 +120,19 @@ or from a worker:
 drush queue:run bunny_net_purge --time-limit=60
 ```
 
-The settings page shows how many purges are waiting. A purge that bunny.net
+The settings page shows how many purges are waiting. A purge that Bunny CDN
 rejects, for example because of a wrong API key, is logged to the `bunny_net`
 channel and not retried.
 
 Without more, each PHP process counts the limits for itself, so several web
-heads and queue runners together can send more than bunny.net allows and get
+heads and queue runners together can send more than Bunny CDN allows and get
 429s back, which only delays purges. With the
 [Redis](https://www.drupal.org/project/redis) module connected (PhpRedis or
 Predis), the counts are kept in Redis or Valkey, under `bunny_net:purge:`, and
 shared by every process. If the server stops answering, a warning is logged and
 the process counts for itself again.
 
-Other code on the site that purges the same bunny.net account can draw on the
+Other code on the site that purges the same Bunny CDN account can draw on the
 same counts through the `bunny_net.rate_limiter` service, or replace it with
 its own `Valicm\BunnyToolkit\Purge\RateLimiter\RateLimiter`.
 
@@ -154,8 +154,8 @@ its own `Valicm\BunnyToolkit\Purge\RateLimiter\RateLimiter`.
 
 ## Pull zone settings
 
-Settings from the bunny.net dashboard can be kept in the exported
-`bunny_net.settings`, under their bunny.net API names, so every environment's
+Settings from the Bunny CDN dashboard can be kept in the exported
+`bunny_net.settings`, under their Bunny CDN API names, so every environment's
 pull zone is set up the same way:
 
 ```yaml
@@ -174,14 +174,14 @@ pull_zone_settings:
 them. Settings left out of config are not touched, so the rest can still be
 managed in the dashboard.
 
-- The names are those of bunny.net's update pull zone API, as in the toolkit's
+- The names are those of Bunny CDN's update pull zone API, as in the toolkit's
   `PullZoneSettingsModel`. A misspelt name or a value of the wrong type fails
   the sync and the settings page shows why.
 - Enum settings, such as `LogFormat`, take the case names of the toolkit's
   enums in `Valicm\BunnyToolkit\Api\Core\Enum`, or a number.
 - `AWSSigningKey`, `AWSSigningSecret` and `LogForwardingToken` hold
   credentials, so they are refused; set them in the dashboard.
-- bunny.net does not return a few settings, such as
+- Bunny CDN does not return a few settings, such as
   `CacheControlBrowserMaxAgeOverride`, so those are sent on every sync.
 
 To start from what the pull zone has today, run
@@ -191,10 +191,11 @@ then export the config.
 
 ### Recommended for Drupal
 
-`drush bunny:zone-recommend` prints the settings a Drupal site behind
-bunny.net wants, each with its reason; `--save` adds them to
-`pull_zone_settings`, keeping any already set there, for `bunny:zone-sync` to
-send:
+A new install has these in `pull_zone_settings`. Nothing is sent until
+`drush bunny:zone-sync` or `drush bunny:sync`, which show each change first:
+review them in the exported config, and remove any your pull zone needs
+otherwise. On a site installed before, `drush bunny:zone-recommend` prints
+them with their reasons, and `--save` adds them, keeping any already set:
 
 | Setting | Value | Why |
 |---|---|---|
@@ -206,39 +207,39 @@ send:
 | `UseStaleWhileUpdating`, `UseStaleWhileOffline` | `true` | The cached page instead of a wait or an error. |
 
 `VerifyOriginSSL` is worth turning on once the origin has a certificate for
-the public hostname: with `AddHostHeader`, bunny.net asks the origin for the
+the public hostname: with `AddHostHeader`, Bunny CDN asks the origin for the
 visitor's domain, and fails if the origin only has a certificate for its own.
 
 Limits for the whole zone, such as `MonthlyBandwidthLimit`,
 `ConnectionLimitPerIPCount` or `RequestLimit`, are pull zone settings too.
 Limits for single paths, such as the login form, belong to Shield's rate
-limiting, set in the bunny.net dashboard.
+limiting, set in the Bunny CDN dashboard.
 
 ### Error page
 
-bunny.net shows its own page when it can't reach the site, a 502 or 504. To
-show the site's own, keep it as an HTML file in the repository and name it on
-the settings page, or in config:
+Bunny CDN shows its own page when it can't reach the site, a 502 or 504. To
+show the site's own, put it at `../bunny/error-page.html`, relative to the
+Drupal root, beside the Edge Rules. `drush bunny:zone-sync` sends it with the
+other settings, as Bunny CDN's custom error page without Bunny CDN's name.
+Without the file, nothing is sent for it, and the page set in the Bunny CDN
+dashboard stays. For another place, name it in `settings.php`:
 
-```yaml
-error_page:
-  file: ../bunny/error-page.html
-  whitelabel: true
+```php
+$settings['bunny_net']['error_page'] = '../cdn/502.html';
 ```
 
-`drush bunny:zone-sync` sends it with the other settings, as bunny.net's
-custom error page, without bunny.net's name when `whitelabel` is on. It can't
-also be set in `pull_zone_settings`.
+It can't also be set in `pull_zone_settings`. Removing the file doesn't take
+the page off the pull zone: switch it off in the dashboard.
 
 The page is shown while Drupal is down, so nothing on it can come from the
 site: inline the CSS and a logo as SVG, or load them from elsewhere.
-bunny.net fills in `{{status_code}}`, `{{status_title}}`,
+Bunny CDN fills in `{{status_code}}`, `{{status_title}}`,
 `{{status_description}}`, `{{target_hostname}}` and `{{user_ip}}`.
 `examples/error-page.html` is the page vallic.com uses, to start from.
 
 ## Caching
 
-The **Caching** section of the settings page sets what bunny.net caches, for
+The **Caching** section of the settings page sets what Bunny CDN caches, for
 sites that don't handle it in their own Edge Rules or middleware. Turn on
 *Manage the pull zone's caching from here*, choose, save, then either press
 *Save and apply caching to the pull zone* or run `drush bunny:caching-sync`
@@ -259,12 +260,14 @@ The rest is chosen:
   region, hostname, or named cookies. Each one multiplies what is cached.
 - **Request headers** to vary by, such as `Accept-Language`.
 - **Countries to block**, answered with a 403.
-- **Paths never cached**, such as `/cart/*`, at bunny.net or in browsers.
+- **Paths never cached**, such as `/cart/*`, at Bunny CDN or in browsers.
 - **Other session cookies**, for a session Drupal doesn't set.
-- **Browser times** for pages and for static files. They replace the times
-  Drupal sends, never on a private response, and never for a page a visitor
-  with a session gets.
-- **Smart Cache**, which lets bunny.net decide what is cacheable.
+- **Browser cache times** for pages and for static files: how long
+  visitors' browsers keep them, in place of the times Drupal sends, never on
+  a private response, and never for a page a visitor with a session gets.
+  Bunny CDN itself keeps them as long as Drupal's `Cache-Control` says, until
+  a purge.
+- **Smart Cache**, which lets Bunny CDN decide what is cacheable.
 
 The rules are named `bunny_net: …` and take the order indexes 20 to 45; a
 sync leaves other rules alone, including those from the Edge Rules directory.
@@ -276,7 +279,7 @@ can use to write the same rules to any pull zone.
 
 ### With middleware
 
-Middleware and these rules can run on the same pull zone, but bunny.net
+Middleware and these rules can run on the same pull zone, but Bunny CDN
 doesn't document their order within a stage, so give each concern one
 owner. If a middleware script bypasses the cache for sessions or paths
 itself, leave those choices empty here.
@@ -340,8 +343,8 @@ extra_actions:
 
 | Key | Default | Values |
 |---|---|---|
-| `description` | `''` | Shown in the bunny.net dashboard. |
-| `order` | none | The rule's place among the zone's rules, bunny.net's `OrderIndex`. Left out, bunny.net places it and syncs leave it there. |
+| `description` | `''` | Shown in the Bunny CDN dashboard. |
+| `order` | none | The rule's place among the zone's rules, Bunny CDN's `OrderIndex`. Left out, Bunny CDN places it and syncs leave it there. |
 | `enabled` | `true` | |
 | `action` | required | An `EdgeRuleActionType` case, such as `Redirect`, `BlockRequest`, `SetResponseHeader`, `OverrideCacheTime`. |
 | `parameters` | `[]` | Up to three action parameters. |
@@ -354,7 +357,7 @@ extra_actions:
 
 The allowed names are the cases of the toolkit's generated enums in
 `Valicm\BunnyToolkit\Api\Core\Enum`. A misspelt name fails the sync and lists
-the valid ones. A plain number is accepted for values bunny.net added after the
+the valid ones. A plain number is accepted for values Bunny CDN added after the
 toolkit was generated.
 
 `drush bunny:rules-sync` shows what it will create, update or delete, then asks
@@ -363,7 +366,7 @@ before making the changes.
 - A rule synced from a file gets `[bunny_net:<file name>]` at the end of its
   description. That is how later syncs find it, in every environment, without
   storing its ID.
-- Rules made in the bunny.net dashboard are never changed or deleted. If a file
+- Rules made in the Bunny CDN dashboard are never changed or deleted. If a file
   describes one exactly, the sync adopts that rule instead of adding a copy.
 - A managed rule whose file was removed is deleted only with `--prune`.
 
@@ -372,10 +375,10 @@ To start from what is in the dashboard today, run
 
 ### Order
 
-bunny.net runs rules from the lowest `order` up. For a cache time, a browser
+Bunny CDN runs rules from the lowest `order` up. For a cache time, a browser
 time and Shield's switches only the first matching rule counts; header
 actions all apply. Give `order` to a rule that has to come before or after
-others. bunny.net refuses two rules at one place.
+others. Bunny CDN refuses two rules at one place.
 
 With caching managed, its rules take 20 to 45: a file with an `order` in that
 range fails, and a caching sync stops while another rule holds one of those
@@ -394,7 +397,7 @@ come after it above 45.
 - **Probes.** Blocks scanners looking for WordPress, `.env` and `.git` at the
   edge.
 
-Shield itself, its WAF and bot detection, is set up in the bunny.net
+Shield itself, its WAF and bot detection, is set up in the Bunny CDN
 dashboard.
 
 ## Maintainers

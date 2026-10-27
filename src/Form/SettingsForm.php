@@ -372,17 +372,17 @@ final class SettingsForm extends ConfigFormBase {
     ];
     $element['browser_pages'] = [
       '#type' => 'select',
-      '#title' => $this->t('Browsers keep pages for'),
+      '#title' => $this->t('Browser cache time for pages'),
       '#options' => $this->times(CachingChoices::PAGE_TIMES),
-      '#description' => $this->t("Short, because bunny.net drops the Vary: Cookie header: a page a visitor saw signed out stays in their browser this long after they sign in."),
+      '#description' => $this->t("How long visitors' browsers keep a page, in place of what Drupal tells them. bunny.net itself still keeps it as long as Drupal's Cache-Control says, until a purge. Short, because bunny.net drops the Vary: Cookie header: a page a visitor saw signed out stays in their browser this long after they sign in."),
       '#config_target' => new ConfigTarget('bunny_net.settings', 'caching.browser_pages', toConfig: static fn(mixed $value): int => is_numeric($value) ? (int) $value : 0),
       '#states' => $states,
     ];
     $element['browser_files'] = [
       '#type' => 'select',
-      '#title' => $this->t('Browsers keep static files for'),
+      '#title' => $this->t('Browser cache time for static files'),
       '#options' => $this->times(CachingChoices::FILE_TIMES),
-      '#description' => $this->t('Stylesheets, scripts, images and fonts. Drupal gives changed aggregates new URLs.'),
+      '#description' => $this->t("How long visitors' browsers keep stylesheets, scripts, images and fonts, in place of what Drupal tells them. bunny.net itself still keeps them as long as Drupal's Cache-Control says, until a purge. Drupal gives changed aggregates new URLs."),
       '#config_target' => new ConfigTarget('bunny_net.settings', 'caching.browser_files', toConfig: static fn(mixed $value): int => is_numeric($value) ? (int) $value : 0),
       '#states' => $states,
     ];
@@ -468,41 +468,30 @@ final class SettingsForm extends ConfigFormBase {
    * The page bunny.net shows when the site does not answer.
    *
    * @return array<string, mixed>
-   *   The form elements.
+   *   The render array.
    */
   private function errorPage(): array {
-    $element = [
+    $path = $this->pullZoneSettings->errorPagePath();
+    try {
+      $code = $this->pullZoneSettings->errorPage()['ErrorPageCustomCode'] ?? NULL;
+      $status = is_string($code)
+        ? $this->t('@file: @count characters.', ['@file' => $path, '@count' => mb_strlen($code)])
+        : $this->t("No file at @file, so bunny.net's page, or the one set in its dashboard, is shown.", ['@file' => $path]);
+    }
+    catch (\InvalidArgumentException $e) {
+      $status = $e->getMessage();
+    }
+    return [
       '#type' => 'details',
       '#title' => $this->t('Error page'),
       '#open' => TRUE,
-      '#tree' => TRUE,
-      '#description' => $this->t("What visitors see when bunny.net can't reach the site, a 502 or 504, instead of bunny.net's own page. An HTML file in the repository, sent with the pull zone settings by <code>drush bunny:zone-sync</code>. It is shown while Drupal is down, so it can't use the site's CSS, images or fonts: keep them inline, or load them from elsewhere. bunny.net fills in placeholders such as <code>{{status_code}}</code>, <code>{{status_title}}</code>, <code>{{status_description}}</code>, <code>{{target_hostname}}</code> and <code>{{user_ip}}</code>; <code>examples/error-page.html</code> in this module uses them."),
+      '#description' => $this->t("What visitors see when bunny.net can't reach the site, a 502 or 504, instead of bunny.net's own page. Put an HTML file at @default, beside the Edge Rules, or name another in settings.php as <code>\$settings['bunny_net']['error_page']</code>; <code>drush bunny:zone-sync</code> sends it with the pull zone settings. It is shown while Drupal is down, so it can't use the site's CSS, images or fonts: keep them inline, or load them from elsewhere. bunny.net fills in placeholders such as <code>{{status_code}}</code>, <code>{{status_title}}</code>, <code>{{status_description}}</code>, <code>{{target_hostname}}</code> and <code>{{user_ip}}</code>; <code>examples/error-page.html</code> in this module uses them.", ['@default' => PullZoneSettings::ERROR_PAGE_FILE]),
+      'status' => [
+        '#type' => 'item',
+        '#title' => $this->t('Page'),
+        '#markup' => $status,
+      ],
     ];
-    $element['file'] = [
-      '#type' => 'textfield',
-      '#title' => $this->t('File'),
-      '#description' => $this->t("Relative to the Drupal root, such as <code>../bunny/error-page.html</code>. Empty leaves the error page to the bunny.net dashboard."),
-      '#config_target' => 'bunny_net.settings:error_page.file',
-    ];
-    $element['whitelabel'] = [
-      '#type' => 'checkbox',
-      '#title' => $this->t("Leave bunny.net's name off the page"),
-      '#config_target' => 'bunny_net.settings:error_page.whitelabel',
-    ];
-    if ($this->pullZoneSettings->errorPageFile() !== '') {
-      try {
-        $code = $this->pullZoneSettings->errorPage()['ErrorPageCustomCode'] ?? '';
-        $status = $this->t('@file: @count characters.', [
-          '@file' => $this->pullZoneSettings->errorPagePath(),
-          '@count' => mb_strlen((string) $code),
-        ]);
-      }
-      catch (\InvalidArgumentException $e) {
-        $status = $e->getMessage();
-      }
-      $element['status'] = ['#type' => 'item', '#title' => $this->t('Page'), '#markup' => $status];
-    }
-    return $element;
   }
 
   /**

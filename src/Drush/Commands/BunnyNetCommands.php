@@ -303,8 +303,9 @@ final class BunnyNetCommands extends DrushCommands {
   /**
    * Prints the settings recommended for Drupal, or saves them to config.
    *
-   * Each comes with the reason. Saved, they join pull_zone_settings, and
-   * settings already there keep their value; bunny:zone-sync sends them.
+   * Each comes with the reason. A new install has them already; for a site
+   * installed before, --save adds them to pull_zone_settings, and settings
+   * already there keep their value. bunny:zone-sync sends them.
    *
    * @param array{save: bool} $options
    *   The command options.

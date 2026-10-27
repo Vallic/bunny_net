@@ -7,6 +7,7 @@ namespace Drupal\bunny_net\PullZone;
 use Drupal\bunny_net\BunnyClientFactory;
 use Drupal\bunny_net\NotConfiguredException;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Site\Settings;
 
 /**
  * Keeps a pull zone's settings in line with pull_zone_settings in config.
@@ -24,16 +25,17 @@ use Drupal\Core\Config\ConfigFactoryInterface;
  *   LogFormat: Json
  * @endcode
  *
- * The page bunny.net shows when the origin can't answer is kept as an HTML
- * file, error_page.file, and sent with these settings.
+ * The page bunny.net shows when the origin can't answer is sent with these
+ * settings, where the site has one at ERROR_PAGE_FILE.
  */
 final class PullZoneSettings {
 
   /**
    * Settings a Drupal site behind bunny.net wants, and why.
    *
-   * `drush bunny:zone-recommend` prints them, or saves them as
-   * pull_zone_settings.
+   * A new install has them in pull_zone_settings; nothing is sent until a
+   * sync. `drush bunny:zone-recommend` prints them, or adds them to a site
+   * installed before.
    */
   public const array RECOMMENDED = [
     'AddHostHeader' => [
@@ -71,9 +73,17 @@ final class PullZoneSettings {
    */
   public const array ERROR_PAGE = ['ErrorPageEnableCustomCode', 'ErrorPageCustomCode', 'ErrorPageWhitelabel'];
 
+  /**
+   * Where the error page is, relative to the Drupal root, by default.
+   *
+   * Beside the Edge Rules and scripts, outside the web root.
+   */
+  public const string ERROR_PAGE_FILE = '../bunny/error-page.html';
+
   public function __construct(
     private readonly BunnyClientFactory $clientFactory,
     private readonly ConfigFactoryInterface $configFactory,
+    private readonly Settings $settings,
     private readonly string $appRoot,
   ) {}
 
@@ -81,50 +91,56 @@ final class PullZoneSettings {
    * Whether there is anything to sync: settings, or an error page.
    */
   public function isConfigured(): bool {
-    return $this->configured() !== [] || $this->errorPageFile() !== '';
+    return $this->configured() !== [] || is_file($this->errorPagePath());
   }
 
   /**
-   * The error page file, as configured, or an empty string.
-   */
-  public function errorPageFile(): string {
-    return trim((string) $this->configFactory->get('bunny_net.settings')->get('error_page.file'));
-  }
-
-  /**
-   * The error page file's path, relative ones from the Drupal root.
+   * Where the error page is kept.
+   *
+   * ERROR_PAGE_FILE, relative to the Drupal root, unless settings.php says
+   * otherwise:
+   *
+   * @code
+   * $settings['bunny_net']['error_page'] = '../cdn/502.html';
+   * @endcode
    */
   public function errorPagePath(): string {
-    $file = $this->errorPageFile();
-    return $file === '' || str_starts_with($file, '/') || str_contains($file, '://') ? $file : $this->appRoot . '/' . $file;
+    $settings = $this->settings->get('bunny_net', []);
+    $file = is_array($settings) && is_string($settings['error_page'] ?? NULL) && trim($settings['error_page']) !== ''
+      ? trim($settings['error_page'])
+      : self::ERROR_PAGE_FILE;
+    return str_starts_with($file, '/') || str_contains($file, '://') ? $file : $this->appRoot . '/' . $file;
   }
 
   /**
-   * The settings the error page is sent as, or none without a file.
+   * The settings the error page is sent as, or none without the file.
+   *
+   * Without bunny.net's name on it: a site with its own page doesn't want
+   * the CDN's.
    *
    * @return array<string, bool|string>
    *   Values by API name.
    *
    * @throws \InvalidArgumentException
-   *   When the file can't be read, or pull_zone_settings sets them too.
+   *   When the file is empty, or pull_zone_settings sets them too.
    */
   public function errorPage(): array {
     $path = $this->errorPagePath();
-    if ($path === '') {
+    if (!is_file($path)) {
       return [];
     }
     $both = array_intersect(self::ERROR_PAGE, array_map(strval(...), array_keys($this->configured())));
     if ($both !== []) {
-      throw new \InvalidArgumentException(sprintf('pull_zone_settings sets %s, which error_page.file sets: keep them in one place.', implode(', ', $both)));
+      throw new \InvalidArgumentException(sprintf('pull_zone_settings sets %s, which the error page %s sets: keep them in one place.', implode(', ', $both), $path));
     }
-    $code = is_file($path) ? file_get_contents($path) : FALSE;
+    $code = file_get_contents($path);
     if (!is_string($code) || trim($code) === '') {
-      throw new \InvalidArgumentException(sprintf('The error page %s is missing or empty.', $path));
+      throw new \InvalidArgumentException(sprintf('The error page %s is empty.', $path));
     }
     return [
       'ErrorPageEnableCustomCode' => TRUE,
       'ErrorPageCustomCode' => $code,
-      'ErrorPageWhitelabel' => (bool) $this->configFactory->get('bunny_net.settings')->get('error_page.whitelabel'),
+      'ErrorPageWhitelabel' => TRUE,
     ];
   }
 

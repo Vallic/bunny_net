@@ -59,11 +59,19 @@ function bunny_net_update_11003(): void {
 }
 
 /**
- * Adds the error page, kept as a file and synced with the pull zone settings.
+ * Formerly added error_page settings, which 11005 removes again.
  */
 function bunny_net_update_11004(): void {
+}
+
+/**
+ * Removes the error_page settings: the page is a file at a fixed place now.
+ *
+ * See PullZoneSettings::ERROR_PAGE_FILE.
+ */
+function bunny_net_update_11005(): void {
   $settings = \Drupal::configFactory()->getEditable('bunny_net.settings');
-  if ($settings->get('error_page') === NULL) {
-    $settings->set('error_page', ['file' => '', 'whitelabel' => TRUE])->save();
+  if ($settings->get('error_page') !== NULL) {
+    $settings->clear('error_page')->save();
   }
 }

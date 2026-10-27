@@ -1,8 +1,12 @@
 pull_zone_id: 0
-pull_zone_settings: {}
-error_page:
-  file: ''
-  whitelabel: true
+pull_zone_settings:
+  AddHostHeader: true
+  FollowRedirects: false
+  DisableCookies: false
+  CacheErrorResponses: false
+  IgnoreQueryStrings: false
+  UseStaleWhileUpdating: true
+  UseStaleWhileOffline: true
 purge:
   enabled: false
   mode: terminate

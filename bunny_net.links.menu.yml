@@ -1,5 +1,5 @@
 bunny_net.settings:
   title: 'Bunny CDN'
-  description: 'Pull zone, cache tags and purging for the bunny.net CDN.'
+  description: 'Pull zone, cache tags and purging for Bunny CDN.'
   route_name: bunny_net.settings
   parent: system.admin_config_services
