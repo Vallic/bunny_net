@@ -1,0 +1,28 @@
+<?php
+
+/**
+ * @file
+ * Update hooks for bunny.net.
+ */
+
+declare(strict_types=1);
+
+/**
+ * Installs Cache Purifier, which now decides the tags bunny.net sees.
+ *
+ * The tags.blocklist setting moves to Cache Purifier's outbound blocklist.
+ */
+function bunny_net_update_11001(): string {
+  \Drupal::service('module_installer')->install(['cache_purifier']);
+
+  $settings = \Drupal::configFactory()->getEditable('bunny_net.settings');
+  $old = $settings->get('tags.blocklist');
+  if (is_array($old)) {
+    $purifier = \Drupal::configFactory()->getEditable('cache_purifier.settings');
+    $blocklist = (array) $purifier->get('outbound.blocklist');
+    $purifier->set('outbound.blocklist', array_values(array_unique([...$blocklist, ...$old])))->save();
+  }
+  $settings->clear('tags.blocklist')->save();
+
+  return (string) t('Installed Cache Purifier and moved the tag blocklist to it.');
+}

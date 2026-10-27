@@ -9,7 +9,9 @@ services:
 
   bunny_net.cache_tags:
     class: Drupal\bunny_net\CacheTags
-    arguments: ['@config.factory', '@cache_purifier.outbound']
+    # Optional, so the container still builds on a site updating from a
+    # version without Cache Purifier; the update installs it.
+    arguments: ['@config.factory', '@?cache_purifier.outbound']
 
   bunny_net.purger:
     class: Drupal\bunny_net\CachePurger

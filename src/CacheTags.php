@@ -18,6 +18,10 @@ use Valicm\BunnyToolkit\CacheTag\TagFormat;
  * and through the same format, so a purged tag always matches the header it
  * was written into. The prefix keeps sites that share a pull zone from
  * purging each other's pages.
+ *
+ * Until Cache Purifier is installed, as on a site updating from a version
+ * without it, nothing is written or purged; bunny_net_update_11001()
+ * installs it.
  */
 final class CacheTags {
 
@@ -28,7 +32,7 @@ final class CacheTags {
 
   public function __construct(
     private readonly ConfigFactoryInterface $configFactory,
-    private readonly OutboundTags $outbound,
+    private readonly ?OutboundTags $outbound = NULL,
   ) {
     $this->format = new HashedTagList();
   }
@@ -54,7 +58,7 @@ final class CacheTags {
    *   Drupal's cache tags.
    */
   public function header(iterable $tags): CdnTagHeader {
-    return $this->format->header($this->prefix($this->outbound->forHeader($tags)));
+    return $this->format->header($this->outbound === NULL ? [] : $this->prefix($this->outbound->forHeader($tags)));
   }
 
   /**
@@ -67,7 +71,7 @@ final class CacheTags {
    *   The tags to purge, without duplicates.
    */
   public function filter(iterable $tags): array {
-    return $this->prefix($this->outbound->forPurge($tags));
+    return $this->outbound === NULL ? [] : $this->prefix($this->outbound->forPurge($tags));
   }
 
   /**
