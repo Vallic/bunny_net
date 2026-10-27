@@ -8,6 +8,7 @@ use Drupal\Core\Http\ClientFactory;
 use Drupal\Core\Site\Settings;
 use GuzzleHttp\Psr7\HttpFactory;
 use Valicm\BunnyToolkit\Bunny;
+use Valicm\BunnyToolkit\Http\GuzzleConcurrentClient;
 
 /**
  * Builds the bunny.net API client from the key in settings.php.
@@ -57,7 +58,9 @@ final class BunnyClientFactory {
         throw new NotConfiguredException('No bunny.net API key: set $settings[\'bunny_net\'][\'api_key\'] in settings.php.');
       }
       $factory = new HttpFactory();
-      $this->bunny = new Bunny($this->apiKey(), $this->httpClientFactory->fromOptions(['timeout' => self::TIMEOUT]), $factory, $factory);
+      // Concurrent, so the purger can send purge.concurrency requests at once.
+      $client = new GuzzleConcurrentClient($this->httpClientFactory->fromOptions(['timeout' => self::TIMEOUT]));
+      $this->bunny = new Bunny($this->apiKey(), $client, $factory, $factory);
     }
     return $this->bunny;
   }

@@ -2,6 +2,7 @@ pull_zone_id: 0
 purge:
   enabled: false
   mode: terminate
+  concurrency: 10
   on_cache_rebuild: false
 tags:
   header: true

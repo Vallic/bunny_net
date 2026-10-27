@@ -19,6 +19,13 @@ bunny_net.settings:
             Choice:
               - terminate
               - queue
+        concurrency:
+          type: integer
+          label: 'Purge requests sent at once'
+          constraints:
+            Range:
+              min: 1
+              max: 50
         on_cache_rebuild:
           type: boolean
           label: 'Purge everything on a cache rebuild'

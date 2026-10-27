@@ -154,7 +154,12 @@ final class CachePurger {
     if ($items === []) {
       return new PurgeResult([]);
     }
-    $purger = $this->clientFactory->get()->purger($this->cacheTags->format(), maxWait: $maxWait, logger: $this->logger);
+    $purger = $this->clientFactory->get()->purger(
+      $this->cacheTags->format(),
+      maxWait: $maxWait,
+      logger: $this->logger,
+      concurrency: max(1, (int) $this->configFactory->get('bunny_net.settings')->get('purge.concurrency')),
+    );
     $result = match ($type) {
       'tags' => $purger->purgeTags($this->pullZoneId(), $items),
       'urls' => $purger->purgeUrls($items),

@@ -80,6 +80,14 @@ final class SettingsForm extends ConfigFormBase {
       ],
       '#config_target' => 'bunny_net.settings:purge.mode',
     ];
+    $form['purge']['concurrency'] = [
+      '#type' => 'number',
+      '#title' => $this->t('Purge requests sent at once'),
+      '#min' => 1,
+      '#max' => 50,
+      '#description' => $this->t('bunny.net takes one tag or URL per request. The rate limits still apply: each request waits for its turn.'),
+      '#config_target' => 'bunny_net.settings:purge.concurrency',
+    ];
     $form['purge']['on_cache_rebuild'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Purge everything on a cache rebuild'),

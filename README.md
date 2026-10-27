@@ -62,6 +62,7 @@ $config['bunny_net.settings']['purge']['enabled'] = TRUE;
 | `pull_zone_id` | `0` | The pull zone to purge. |
 | `purge.enabled` | `false` | Purge when Drupal invalidates cache tags. |
 | `purge.mode` | `terminate` | `terminate` purges after the response is sent and queues what the rate limits defer; `queue` leaves everything to cron. |
+| `purge.concurrency` | `10` | Purge requests sent at once, 1 to 50. bunny.net takes one tag per request; each still waits for the rate limit. |
 | `purge.on_cache_rebuild` | `false` | Empty the pull zone on every cache rebuild, such as `drush cr` at the end of a deploy. |
 | `tags.header` | `true` | Add the `CDN-Tag` header. |
 | `tags.prefix` | `''` | Prepended to every tag. Needed when several sites share a pull zone; give each site its own prefix. |

@@ -113,21 +113,35 @@ final class PurgeTest extends BunnyNetKernelTestBase {
    * What bunny.net can't take now is queued and sent by cron.
    */
   public function testDeferredPurgesAreQueued(): void {
+    $this->answers->append(new Response(204), new Response(503), new Response(204));
+    $result = $this->container->get('bunny_net.purger')->purgeTags(['node:1', 'node:2', 'node:3']);
+
+    $this->assertCount(3, $this->sent, 'All three are sent at once.');
+    $this->assertSame(['node:1', 'node:3'], $result->purged);
+    $item = $this->queue()->claimItem();
+    $this->assertInstanceOf(\stdClass::class, $item);
+    $this->assertSame(['type' => 'tags', 'items' => ['node:2']], $item->data);
+    $this->queue()->releaseItem($item);
+
+    $this->answerNoContent();
+    $this->container->get('cron')->run();
+
+    $this->assertSame(['CacheTag' => (new HashedTagList())->purgeValue('node:2')], $this->sentRequests()[3][1]);
+    $this->assertSame(0, $this->queue()->numberOfItems());
+  }
+
+  /**
+   * One at a time, a failure stops the rest from being sent.
+   */
+  public function testSequentialPurges(): void {
+    $this->config('bunny_net.settings')->set('purge.concurrency', 1)->save();
     $this->answers->append(new Response(204), new Response(503));
     $this->container->get('bunny_net.purger')->purgeTags(['node:1', 'node:2', 'node:3']);
 
     $this->assertCount(2, $this->sent);
     $item = $this->queue()->claimItem();
     $this->assertInstanceOf(\stdClass::class, $item);
-    $format = new HashedTagList();
     $this->assertSame(['type' => 'tags', 'items' => ['node:2', 'node:3']], $item->data);
-    $this->queue()->releaseItem($item);
-
-    $this->answerNoContent(2);
-    $this->container->get('cron')->run();
-
-    $this->assertSame(['CacheTag' => $format->purgeValue('node:3')], $this->sentRequests()[3][1]);
-    $this->assertSame(0, $this->queue()->numberOfItems());
   }
 
   /**
