@@ -17,7 +17,7 @@ use Drupal\Component\Serialization\Yaml;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drush\Attributes as CLI;
 use Drush\Commands\DrushCommands;
-use Drush\Commands\core\DeployCommands;
+use Drush\Commands\core\DeployHookCommands;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Valicm\BunnyToolkit\Purge\PurgeResult;
 
@@ -236,7 +236,12 @@ final class BunnyNetCommands extends DrushCommands {
    * After drush deploy, where sync_on_deploy is on: scripts, then the zone.
    *
    * What bunny:script-deploy and bunny:sync do, without asking, once config
-   * is imported. Scripts go first, so a pull zone setting naming a script
+   * is imported. Hooked to deploy:hook, the last step drush deploy runs with
+   * Drupal booted: deploy itself runs without Drupal (bootstrap NONE) and
+   * starts its steps as their own processes, so a module's hook on deploy is
+   * never found. drush deploy:hook on its own syncs too.
+   *
+   * Scripts go first, so a pull zone setting naming a script
    * (MiddlewareScriptId) never points at code that isn't there yet. A
    * failure is reported and doesn't fail the deploy: the site is already
    * live, and the next deploy, or the commands by hand, try again.
@@ -246,7 +251,7 @@ final class BunnyNetCommands extends DrushCommands {
    * @param \Consolidation\AnnotatedCommand\CommandData $commandData
    *   The deploy command's data.
    */
-  #[CLI\Hook(type: HookManager::POST_COMMAND_HOOK, target: DeployCommands::DEPLOY)]
+  #[CLI\Hook(type: HookManager::POST_COMMAND_HOOK, target: DeployHookCommands::HOOK)]
   public function postDeploy(mixed $result, CommandData $commandData): void {
     if (!$this->configFactory->get('bunny_net.settings')->get('sync_on_deploy')) {
       return;

@@ -87,6 +87,13 @@ script (`MiddlewareScriptId`) never points at code that isn't there. A failure
 is logged as a warning and doesn't fail the deploy; run the commands by hand
 to retry.
 
+It runs after `drush deploy:hook`, the last step of `drush deploy` that boots
+Drupal (`deploy` itself doesn't, so it can't carry a module's hook), and so
+after `drush deploy:hook` run on its own too. On the deploy that installs
+bunny_net, nothing runs yet: Drush finds its commands only once it is
+installed. Run `drush bunny:script-deploy` and `drush bunny:sync` by hand
+that once.
+
 ### Where files go
 
 What a site deploys to Bunny CDN lives in one folder beside the Drupal root,

@@ -6,6 +6,11 @@ namespace Drupal\Tests\bunny_net\Kernel;
 
 use Consolidation\AnnotatedCommand\CommandData;
 use Drupal\bunny_net\Drush\Commands\BunnyNetCommands;
+use Drush\Attributes\Bootstrap;
+use Drush\Attributes\Hook;
+use Drush\Boot\DrupalBootLevels;
+use Drush\Commands\core\DeployCommands;
+use Drush\Commands\core\DeployHookCommands;
 use Drush\Commands\DrushCommands;
 use Drush\Log\DrushLoggerManager;
 use GuzzleHttp\Psr7\Response;
@@ -107,7 +112,17 @@ final class DeploySyncTest extends BunnyNetKernelTestBase {
   }
 
   /**
-   * Runs the hook as drush deploy would, once it has finished.
+   * The hook is on deploy:hook: drush deploy boots no Drupal to find it.
+   */
+  public function testHookedToDeployHook(): void {
+    $attributes = (new \ReflectionMethod(BunnyNetCommands::class, 'postDeploy'))->getAttributes(Hook::class);
+    $this->assertCount(1, $attributes);
+    $this->assertSame(DeployHookCommands::HOOK, $attributes[0]->newInstance()->target);
+    $this->assertSame(DrupalBootLevels::NONE, (new \ReflectionClass(DeployCommands::class))->getAttributes(Bootstrap::class)[0]->newInstance()->level);
+  }
+
+  /**
+   * Runs the hook as drush deploy:hook would, once it has finished.
    */
   private function postDeploy(): void {
     $commands = BunnyNetCommands::create($this->container);
