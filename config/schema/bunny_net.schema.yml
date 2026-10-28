@@ -10,6 +10,9 @@ bunny_net.settings:
       label: 'Pull zone settings, by bunny.net API name'
       sequence:
         type: bunny_net.pull_zone_setting
+    sync_on_deploy:
+      type: boolean
+      label: 'After drush deploy, deploy the Edge Scripts and sync the pull zone'
     purge:
       type: mapping
       label: 'Purging'

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\bunny_net\Drush\Commands;
 
+use Consolidation\AnnotatedCommand\CommandData;
+use Consolidation\AnnotatedCommand\Hooks\HookManager;
 use Drupal\bunny_net\CachePurger;
 use Drupal\bunny_net\EdgeRule\EdgeRuleChange;
 use Drupal\bunny_net\EdgeRule\EdgeRuleSync;
@@ -15,6 +17,7 @@ use Drupal\Component\Serialization\Yaml;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drush\Attributes as CLI;
 use Drush\Commands\DrushCommands;
+use Drush\Commands\core\DeployCommands;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Valicm\BunnyToolkit\Purge\PurgeResult;
 
@@ -226,6 +229,59 @@ final class BunnyNetCommands extends DrushCommands {
   #[CLI\Option(name: 'prune', description: 'Delete managed Edge Rules whose file is gone.')]
   #[CLI\Usage(name: 'drush bunny:sync -y', description: 'Bring the pull zone in line with config after a deploy.')]
   public function sync(array $options = ['dry-run' => FALSE, 'prune' => FALSE]): void {
+    $this->syncZone((bool) $options['dry-run'], (bool) $options['prune'], TRUE);
+  }
+
+  /**
+   * After drush deploy, where sync_on_deploy is on: scripts, then the zone.
+   *
+   * What bunny:script-deploy and bunny:sync do, without asking, once config
+   * is imported. Scripts go first, so a pull zone setting naming a script
+   * (MiddlewareScriptId) never points at code that isn't there yet. A
+   * failure is reported and doesn't fail the deploy: the site is already
+   * live, and the next deploy, or the commands by hand, try again.
+   *
+   * @param mixed $result
+   *   The deploy command's result.
+   * @param \Consolidation\AnnotatedCommand\CommandData $commandData
+   *   The deploy command's data.
+   */
+  #[CLI\Hook(type: HookManager::POST_COMMAND_HOOK, target: DeployCommands::DEPLOY)]
+  public function postDeploy(mixed $result, CommandData $commandData): void {
+    if (!$this->configFactory->get('bunny_net.settings')->get('sync_on_deploy')) {
+      return;
+    }
+    $this->io()->section(dt('Bunny CDN'));
+    foreach ($this->scriptDeployer->names() as $name) {
+      try {
+        $this->io()->writeln(sprintf('  script   %s: %s', $name, $this->scriptDeployer->deploy($name)));
+      }
+      catch (\Throwable $e) {
+        $this->logger()?->warning(dt('Edge Script @name was not deployed: @reason. Run drush bunny:script-deploy.', [
+          '@name' => $name,
+          '@reason' => $e->getMessage(),
+        ]));
+      }
+    }
+    try {
+      $this->syncZone(FALSE, FALSE, FALSE);
+    }
+    catch (\Throwable $e) {
+      $this->logger()?->warning(dt('The pull zone was not brought in line with config: @reason. Run drush bunny:sync.', ['@reason' => $e->getMessage()]));
+    }
+  }
+
+  /**
+   * Plans the zone's settings, caching and rules, shows them, and applies them.
+   *
+   * @param bool $dryRun
+   *   Only show the changes.
+   * @param bool $prune
+   *   Delete managed Edge Rules whose file is gone.
+   * @param bool $confirm
+   *   Ask before applying.
+   */
+  private function syncZone(bool $dryRun, bool $prune, bool $confirm): void {
     $hasRules = $this->edgeRuleSync->hasDirectory();
     if (!$this->pullZoneSettings->isConfigured() && !$this->cachingSync->isEnabled() && !$hasRules) {
       $this->io()->warning(dt('Nothing to sync: no pull_zone_settings or error page, caching is not managed here, and there is no Edge Rules directory at @directory.', ['@directory' => $this->edgeRuleSync->directory()]));
@@ -235,7 +291,7 @@ final class BunnyNetCommands extends DrushCommands {
     $caching = $this->cachingSync->isEnabled() ? $this->cachingSync->plan() : NULL;
     $rules = [];
     if ($hasRules) {
-      $rules = array_values(array_filter($this->edgeRuleSync->plan(), static fn(EdgeRuleChange $change): bool => $change->isChange() && ($change->operation !== EdgeRuleChange::DELETE || $options['prune'])));
+      $rules = array_values(array_filter($this->edgeRuleSync->plan(), static fn(EdgeRuleChange $change): bool => $change->isChange() && ($change->operation !== EdgeRuleChange::DELETE || $prune)));
     }
 
     $lines = [
@@ -243,17 +299,16 @@ final class BunnyNetCommands extends DrushCommands {
       ...array_map(static fn(string $line): string => 'caching  ' . $line, $caching?->describe() ?? []),
       ...array_map(static fn(EdgeRuleChange $change): string => sprintf('rule     %s %s', $change->operation, $change->name), $rules),
     ];
+    $zone = $this->configFactory->get('bunny_net.settings')->get('pull_zone_id');
     if ($lines === []) {
-      $this->io()->success(dt('Pull zone @zone is in sync.', ['@zone' => $this->configFactory->get('bunny_net.settings')->get('pull_zone_id')]));
+      $this->io()->success(dt('Pull zone @zone is in sync.', ['@zone' => $zone]));
       return;
     }
     foreach ($lines as $line) {
       $this->io()->writeln('  ' . $line);
     }
-    if ($options['dry-run'] || !$this->io()->confirm(dt('Apply @count change(s) to pull zone @zone?', [
-      '@count' => count($lines),
-      '@zone' => $this->configFactory->get('bunny_net.settings')->get('pull_zone_id'),
-    ]))) {
+    $counts = ['@count' => count($lines), '@zone' => $zone];
+    if ($dryRun || ($confirm && !$this->io()->confirm(dt('Apply @count change(s) to pull zone @zone?', $counts)))) {
       return;
     }
 
@@ -264,9 +319,9 @@ final class BunnyNetCommands extends DrushCommands {
     foreach ($rules as $change) {
       $this->edgeRuleSync->apply($change);
     }
-    $this->io()->success(dt('Applied @count change(s).', ['@count' => count($lines)]));
+    $this->io()->success(dt('Applied @count change(s) to pull zone @zone.', $counts));
     if ($ignored !== []) {
-      $this->io()->warning(dt('bunny.net kept other values for: @keys', ['@keys' => implode(', ', $ignored)]));
+      $this->io()->warning(dt('Bunny CDN kept other values for: @keys', ['@keys' => implode(', ', $ignored)]));
     }
   }
 

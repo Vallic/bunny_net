@@ -75,3 +75,15 @@ function bunny_net_update_11005(): void {
     $settings->clear('error_page')->save();
   }
 }
+
+/**
+ * Adds sync_on_deploy, off.
+ *
+ * A deploy brings the pull zone in line only where an environment turns it on.
+ */
+function bunny_net_update_11006(): void {
+  $settings = \Drupal::configFactory()->getEditable('bunny_net.settings');
+  if ($settings->get('sync_on_deploy') === NULL) {
+    $settings->set('sync_on_deploy', FALSE)->save();
+  }
+}

@@ -70,6 +70,23 @@ The three never change each other's rules, and none changes a rule made in the
 Bunny CDN dashboard. A setting can be in `pull_zone_settings` or set by
 caching, not both: the sync refuses it and the settings page says which.
 
+### On deploy
+
+To bring the pull zone in line on every deploy, turn on `sync_on_deploy` in the
+environment that owns the zone, as for purging:
+
+```php
+// settings.php on production only.
+$config['bunny_net.settings']['sync_on_deploy'] = TRUE;
+```
+
+After `drush deploy` has imported config, the Edge Scripts that changed are
+deployed, then `bunny:sync` runs without asking: pull zone settings and the
+error page, caching, and Edge Rules. Scripts go first, so a setting naming a
+script (`MiddlewareScriptId`) never points at code that isn't there. A failure
+is logged as a warning and doesn't fail the deploy; run the commands by hand
+to retry.
+
 ### Where files go
 
 What a site deploys to Bunny CDN lives in one folder beside the Drupal root,
@@ -120,6 +137,7 @@ $config['bunny_net.settings']['purge']['enabled'] = TRUE;
 | `purge.on_cache_rebuild` | `false` | Empty the pull zone on every cache rebuild, such as `drush cr` at the end of a deploy. |
 | `tags.header` | `true` | Add the `CDN-Tag` header. |
 | `tags.prefix` | `''` | Prepended to every tag. Needed when several sites share a pull zone; give each site its own prefix. |
+| `sync_on_deploy` | `false` | Deploy the Edge Scripts and sync the pull zone after `drush deploy`. Turn it on per environment. |
 | `edge_scripts` | `{}` | See below. |
 | `edge_rules.directory` | `''` | Empty reads the rules from `../bunny/rules`. See below. |
 
