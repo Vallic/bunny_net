@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\bunny_net\Form;
 
 use Drupal\bunny_net\CachePurger;
+use Drupal\bunny_net\CacheTags;
 use Drupal\bunny_net\EdgeRule\EdgeRuleSync;
 use Drupal\bunny_net\EdgeScript\ScriptDeployer;
 use Drupal\bunny_net\NotConfiguredException;
@@ -19,9 +20,11 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Locale\CountryManagerInterface;
 use Drupal\Core\Queue\QueueFactory;
 use Drupal\Core\Site\Settings;
+use Drupal\Core\Url;
 use Psr\Http\Client\ClientExceptionInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Valicm\BunnyToolkit\Caching\CachingChoices;
+use Valicm\BunnyToolkit\CacheTag\HashedTagList;
 use Valicm\BunnyToolkit\Caching\VaryCache;
 use Valicm\BunnyToolkit\Http\ApiException;
 
@@ -170,6 +173,13 @@ final class SettingsForm extends ConfigFormBase {
       '#description' => $this->t('Needed when several sites share the pull zone, so they purge only their own pages. Use a different one per site.'),
       '#config_target' => 'bunny_net.settings:tags.prefix',
     ];
+    $form['tags']['hash_length'] = [
+      '#type' => 'select',
+      '#title' => $this->t('Characters per hashed tag'),
+      '#options' => $this->hashLengths(),
+      '#description' => $this->t('Shorter tokens fit more tags in the 1024-byte header, but a purge also reaches unrelated pages more often. Pages already cached keep their old tokens, so purge everything after changing this.'),
+      '#config_target' => 'bunny_net.settings:tags.hash_length',
+    ];
     $form['tags']['purifier'] = [
       '#type' => 'item',
       '#markup' => $this->t('Which tags are written and purged is set in Cache Purifier: its blocklist, aliases and buckets, and its rules for who and what may purge.'),
@@ -272,6 +282,43 @@ final class SettingsForm extends ConfigFormBase {
     catch (NotConfiguredException | \InvalidArgumentException | ApiException | ClientExceptionInterface $e) {
       $this->messenger()->addError($this->t('Caching was saved but not applied: @reason', ['@reason' => $e->getMessage()]));
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * @param array<mixed> $form
+   *   The form.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The form state.
+   */
+  public function submitForm(array &$form, FormStateInterface $form_state): void {
+    // The editable config already holds the submitted values by now.
+    $before = (int) $this->configFactory()->get('bunny_net.settings')->getOriginal('tags.hash_length', FALSE);
+    parent::submitForm($form, $form_state);
+    if ($before !== (int) $form_state->getValue('hash_length')) {
+      $this->messenger()->addWarning($this->t('Purges by tag no longer reach pages already cached. <a href=":url">Purge everything</a> so they are cached again with the new tags.', [
+        ':url' => Url::fromRoute('bunny_net.purge_all')->toString(),
+      ]));
+    }
+  }
+
+  /**
+   * The hash lengths to choose from, with how many tags fit in a header.
+   *
+   * @return array<int, \Drupal\Core\StringTranslation\TranslatableMarkup>
+   *   The labels, by length.
+   */
+  private function hashLengths(): array {
+    $options = [];
+    foreach (range(HashedTagList::MIN_HASH_LENGTH, HashedTagList::MAX_HASH_LENGTH) as $length) {
+      // 1024 bytes, less the guards, with a space before each token.
+      $tags = intdiv(1024 - 3, $length + 1);
+      $options[$length] = $length === CacheTags::DEFAULT_HASH_LENGTH
+        ? $this->t('@length: about @tags tags (default)', ['@length' => $length, '@tags' => $tags])
+        : $this->t('@length: about @tags tags', ['@length' => $length, '@tags' => $tags]);
+    }
+    return $options;
   }
 
   /**

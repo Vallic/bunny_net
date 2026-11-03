@@ -26,22 +26,24 @@ use Valicm\BunnyToolkit\CacheTag\TagFormat;
 final class CacheTags {
 
   /**
-   * The tag format, shared with the purger.
+   * Characters per hashed tag, unless the settings choose another length.
    */
-  private readonly TagFormat $format;
+  public const int DEFAULT_HASH_LENGTH = 5;
 
   public function __construct(
     private readonly ConfigFactoryInterface $configFactory,
     private readonly ?OutboundTags $outbound = NULL,
-  ) {
-    $this->format = new HashedTagList();
-  }
+  ) {}
 
   /**
    * The format the header is written in and tags are purged with.
+   *
+   * A length out of range, as a settings.php override could set, falls back
+   * to the default: this runs on every response and must not throw.
    */
   public function format(): TagFormat {
-    return $this->format;
+    $length = (int) $this->configFactory->get('bunny_net.settings')->get('tags.hash_length');
+    return new HashedTagList($length >= HashedTagList::MIN_HASH_LENGTH && $length <= HashedTagList::MAX_HASH_LENGTH ? $length : self::DEFAULT_HASH_LENGTH);
   }
 
   /**
@@ -58,7 +60,7 @@ final class CacheTags {
    *   Drupal's cache tags.
    */
   public function header(iterable $tags): CdnTagHeader {
-    return $this->format->header($this->outbound === NULL ? [] : $this->prefix($this->outbound->forHeader($tags)));
+    return $this->format()->header($this->outbound === NULL ? [] : $this->prefix($this->outbound->forHeader($tags)));
   }
 
   /**

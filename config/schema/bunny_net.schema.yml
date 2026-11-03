@@ -48,6 +48,13 @@ bunny_net.settings:
         prefix:
           type: string
           label: 'Tag prefix'
+        hash_length:
+          type: integer
+          label: 'Characters per hashed tag'
+          constraints:
+            Range:
+              min: 3
+              max: 8
     edge_scripts:
       type: sequence
       label: 'Edge Scripts deployed from files'

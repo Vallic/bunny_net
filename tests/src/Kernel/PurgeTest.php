@@ -133,6 +133,19 @@ final class PurgeTest extends BunnyNetKernelTestBase {
   }
 
   /**
+   * A purge matches the header at the configured hash length, once saved.
+   */
+  public function testPurgeUsesTheConfiguredHashLength(): void {
+    $this->config('bunny_net.settings')->set('tags.hash_length', 8)->save();
+    Cache::invalidateTags(['node:1']);
+
+    $this->answerNoContent(1);
+    $this->container->get('bunny_net.cache_tags_invalidator')->destruct();
+
+    $this->assertSame(['CacheTag' => (new HashedTagList(8))->purgeValue('node:1')], $this->sentRequests()[0][1]);
+  }
+
+  /**
    * Purges draw on bunny_net.rate_limiter, which a site can replace.
    */
   public function testPurgesDrawOnTheRateLimiterService(): void {

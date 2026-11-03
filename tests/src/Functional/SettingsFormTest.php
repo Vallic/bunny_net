@@ -84,6 +84,27 @@ final class SettingsFormTest extends BrowserTestBase {
   }
 
   /**
+   * The hash length defaults to 5, offers 3 to 8, and warns when changed.
+   */
+  public function testHashLength(): void {
+    $this->drupalLogin($this->drupalCreateUser(['administer bunny_net']));
+    $this->drupalGet('admin/config/development/bunny');
+    $this->assertSession()->fieldValueEquals('hash_length', '5');
+    $this->assertSession()->optionExists('hash_length', '3');
+    $this->assertSession()->optionExists('hash_length', '8');
+    $this->assertSession()->optionNotExists('hash_length', '2');
+    $this->assertSession()->optionNotExists('hash_length', '9');
+
+    $this->submitForm([], 'Save configuration');
+    $this->assertSession()->pageTextNotContains('Purge everything so they are cached');
+
+    $this->submitForm(['hash_length' => '6'], 'Save configuration');
+    $this->assertSession()->pageTextContains('The configuration options have been saved.');
+    $this->assertSession()->pageTextContains('Purge everything so they are cached');
+    $this->assertSame(6, $this->config('bunny_net.settings')->get('tags.hash_length'));
+  }
+
+  /**
    * Caching is chosen on the form and saved as lists in config.
    */
   public function testCaching(): void {

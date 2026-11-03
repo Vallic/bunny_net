@@ -16,6 +16,7 @@ purge:
 tags:
   header: true
   prefix: ''
+  hash_length: 5
 edge_scripts: {}
 edge_rules:
   directory: ''

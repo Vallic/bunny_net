@@ -19,6 +19,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[CoversFunction('bunny_net_update_11001')]
 #[CoversFunction('bunny_net_update_11003')]
 #[CoversFunction('bunny_net_update_11005')]
+#[CoversFunction('bunny_net_update_11007')]
 #[RunTestsInSeparateProcesses]
 final class UpdateTest extends KernelTestBase {
 
@@ -95,6 +96,22 @@ final class UpdateTest extends KernelTestBase {
     bunny_net_update_11005();
 
     $this->assertNull($this->config('bunny_net.settings')->get('error_page'));
+  }
+
+  /**
+   * An existing site gets the length it has used, and a chosen one is kept.
+   */
+  public function testHashLengthUpdate(): void {
+    $this->installConfig(['bunny_net']);
+    $this->config('bunny_net.settings')->clear('tags.hash_length')->save();
+
+    $this->container->get('module_handler')->loadInclude('bunny_net', 'install');
+    bunny_net_update_11007();
+    $this->assertSame(5, $this->config('bunny_net.settings')->get('tags.hash_length'));
+
+    $this->config('bunny_net.settings')->set('tags.hash_length', 7)->save();
+    bunny_net_update_11007();
+    $this->assertSame(7, $this->config('bunny_net.settings')->get('tags.hash_length'));
   }
 
 }

@@ -87,3 +87,13 @@ function bunny_net_update_11006(): void {
     $settings->set('sync_on_deploy', FALSE)->save();
   }
 }
+
+/**
+ * Adds tags.hash_length, 5: the length every site has used so far.
+ */
+function bunny_net_update_11007(): void {
+  $settings = \Drupal::configFactory()->getEditable('bunny_net.settings');
+  if ($settings->get('tags.hash_length') === NULL) {
+    $settings->set('tags.hash_length', 5)->save();
+  }
+}

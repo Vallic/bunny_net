@@ -144,6 +144,7 @@ $config['bunny_net.settings']['purge']['enabled'] = TRUE;
 | `purge.on_cache_rebuild` | `false` | Empty the pull zone on every cache rebuild, such as `drush cr` at the end of a deploy. |
 | `tags.header` | `true` | Add the `CDN-Tag` header. |
 | `tags.prefix` | `''` | Prepended to every tag. Needed when several sites share a pull zone; give each site its own prefix. |
+| `tags.hash_length` | `5` | Characters per hashed tag, 3 to 8. See below. |
 | `sync_on_deploy` | `false` | Deploy the Edge Scripts and sync the pull zone after `drush deploy`. Turn it on per environment. |
 | `edge_scripts` | `{}` | See below. |
 | `edge_rules.directory` | `''` | Empty reads the rules from `../bunny/rules`. See below. |
@@ -160,11 +161,27 @@ blocklist, aliases and buckets, and the order that puts list tags first. Its
 rules decide who and what may purge; target them at
 `bunny_net.cache_tags_invalidator`.
 
-Bunny caps `CDN-Tag` at 1024 bytes. Each tag is therefore hashed to a
-5-character token, and a purge matches the token with a wildcard. About 170
-tags fit in one header. If a page has more, the last ones are left out, and
-those pages refresh only when their cache lifetime ends. A hash collision only
-causes an extra purge.
+Bunny caps `CDN-Tag` at 1024 bytes. Each tag is therefore hashed to a short
+token, 5 characters by default, and a purge matches the token with a wildcard.
+If a page has more tags than fit, the last ones are left out, and those pages
+refresh only when their cache lifetime ends. A hash collision only causes an
+extra purge.
+
+`tags.hash_length` trades tags per header against those extra purges:
+
+| Length | Tags per header | A purge also hits a full page |
+|---|---|---|
+| 3 | 255 | 1 in 1,000 |
+| 4 | 204 | 1 in 82,000 |
+| 5 | 170 | 1 in 6.3 million |
+| 6 | 145 | 1 in 470 million |
+| 7 | 127 | 1 in 35 billion |
+| 8 | 113 | 1 in 2.5 trillion |
+
+Before shortening tokens to fit a page's tags, try Cache Purifier's blocklist
+and buckets, which need no purge. After changing the length, purge everything:
+pages already cached keep their old tokens, so purges by tag no longer reach
+them.
 
 ### Rate limits and the queue
 

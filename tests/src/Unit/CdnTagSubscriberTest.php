@@ -68,6 +68,26 @@ final class CdnTagSubscriberTest extends UnitTestCase {
   }
 
   /**
+   * The header uses the configured hash length.
+   */
+  public function testHashLength(): void {
+    $response = $this->respond(['node:1'], ['hash_length' => 8]);
+    $expected = (new HashedTagList(8))->header(['node:1'])->value;
+    $this->assertSame($expected, $response->headers->get('CDN-Tag'));
+  }
+
+  /**
+   * A missing or out of range length gets the default, and never throws.
+   */
+  public function testInvalidHashLengthFallsBack(): void {
+    $expected = (new HashedTagList())->header(['node:1'])->value;
+    foreach ([NULL, 0, 2, 9] as $length) {
+      $response = $this->respond(['node:1'], ['hash_length' => $length]);
+      $this->assertSame($expected, $response->headers->get('CDN-Tag'));
+    }
+  }
+
+  /**
    * No header when it is off, all tags are blocklisted, or it isn't public.
    */
   public function testNoHeader(): void {
